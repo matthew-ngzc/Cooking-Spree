@@ -22,6 +22,8 @@ Read [docs/direction.md](docs/direction.md) before proposing product work and [p
 
 Agents may commit and open pull requests. Use [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) for commit messages. A PR must contain a clear changelog, the reason for the change, material decisions/trade-offs, verification evidence, and the associated documentation updates. The user reviews every PR and has final approval; opening a PR never authorizes a merge.
 
+Every PR, in every phase and for work outside the roadmap, must include evidence that makes the changed behavior reviewable without checking out the branch. For visual or scene changes, attach labelled screenshots of every materially changed scene and include before/after views when they clarify the difference. For interaction, animation, or lifecycle behavior that a still image cannot prove, attach a short screen recording or a concise sequence of screenshots. Non-visual changes still require relevant command/test results. State the device or emulator and API level used for Android evidence, identify any scenario that was not verified, and redact account details, tokens, Firebase configuration, and other sensitive data from all evidence.
+
 Use `.github/pull_request_template.md` when opening a PR.
 
 For a decision that changes architecture, persistence/data compatibility, platform scope, multiplayer/online approach, or a product commitment, create a concise ADR under `docs/decisions/` before or alongside implementation. The user decides whether it is accepted. See [docs/decisions/README.md](docs/decisions/README.md).
