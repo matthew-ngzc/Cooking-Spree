@@ -6,15 +6,15 @@
 
 **Outcome:** a reproducibly buildable Android app whose existing single-player loop can be played, paused, saved, loaded, and ended while signed out and offline, without the validated crashes, destructive saves, duplicate tutorial sessions, or abandoned background work.
 
-**Status:** draft for approval. The owner requested a detailed plan to be executed by Luna; this document does not claim that the owner has accepted its proposed pause/save policies or that implementation has begun.
+**Status:** implementation authorized by the owner on 2026-10-03. ADR 0003 remains a separate owner-acceptance gate before slices 0D and 0E.
 
 ## Phase progress
 
-- [ ] Owner approves this Phase 0 implementation contract.
+- [ ] Owner approves this Phase 0 implementation contract. Implementation was requested on 2026-10-03, but this owner-only checkbox remains for the owner to mark directly.
 - [ ] Owner accepts ADR 0003 before slices 0D and 0E.
-- [ ] 0A — Verify and stabilise the build.
-- [ ] 0B — Signed-out and unavailable-cloud safety.
-- [ ] 0C — Single session, cancellation, and render/input teardown.
+- [x] 0A — Verify and stabilise the build. Evidence: clean wrapper build and unit tests passed on 2026-10-03; instrumentation APK compiled after correcting the application-package assertion. See [development verification](../docs/development.md#current-verified-build-state).
+- [x] 0B — Signed-out and unavailable-cloud safety. Evidence: focused tests plus the API 36 signed-out/airplane-mode launch, settings restart, and natural game-over run recorded in [development verification](../docs/development.md#current-verified-build-state).
+- [x] 0C — Single session, cancellation, and render/input teardown. Evidence: focused unit/device lifecycle checks and five repeated actual surface cycles passed; see [runtime architecture verification](../docs/architecture.md#concurrency-boundaries).
 - [ ] 0D — Consistent pause and tutorial lifecycle.
 - [ ] 0E — Non-destructive saves and validated legacy loading.
 - [ ] 0F — Integration evidence and delivery.
@@ -52,14 +52,15 @@ The project root is the Git repository and `android/` is the Android Gradle proj
 
 Environment setup is part of execution, not an assumed owner prerequisite. The agent performs the following preflight before relying on test results and prepares device access early enough for lifecycle tests in 0C onward:
 
-1. [ ] Locate the actual Android SDK and supported JDK; verify Java/Gradle compatibility, SDK platform 35 for compilation, platform-tools/ADB, and emulator tooling. Use installed paths explicitly when tools are absent from PATH. Inspect existing SDK, AVD, and device configuration before installing or changing anything.
-2. [ ] Check attached devices with `adb devices -l` and list available virtual devices using the installed emulator-management tool. Inspect the owner's AVD location explicitly if the execution environment uses a different Windows user/profile; an empty list under a sandbox profile does not prove no owner AVD exists.
-3. [ ] Reuse a suitable development AVD/device. If none exists, create a dedicated Cooking Spree test AVD using an API 35 system image compatible with the host; API 34+ is the app's runtime requirement. Install only missing development packages needed for this setup. No Google-account login is required for Phase 0 guest/offline tests. Do not wipe an existing personal device or unrelated AVD.
-4. [ ] Start the AVD through command-line tooling, or use an owner-started device. Android Studio does not need to remain open. Wait for ADB to report the selected device ready and confirm Android has completed booting. Record its serial, API level, image, and relevant display configuration; select one explicit target if several devices are connected.
-5. [ ] After build recovery, run `gradlew.bat assembleDebug` and `gradlew.bat testDebugUnitTest` from `android/`. With the selected device ready, run `gradlew.bat connectedDebugAndroidTest`; build/run the app for the acceptance scenarios. Capture test reports, relevant redacted logs, labelled screenshots of materially changed scenes and key acceptance states, and short recordings or screenshot sequences where interaction/lifecycle behavior cannot be demonstrated by a still image. Capture additional screenshots for device/visual failures. Establish controlled guest/offline state on the dedicated test device without resetting the owner's data.
-6. [ ] Record the reproducible launch/test commands and any required setup in `docs/development.md` and repository documentation. Local unit tests do not need a running emulator. Automated device scenarios must assert outcomes, not merely launch the app; use a small test harness for canvas game state alongside tests through real Android controls.
+1. [x] Locate the actual Android SDK and supported JDK; verify Java/Gradle compatibility, SDK platform 35 for compilation, platform-tools/ADB, and emulator tooling. Evidence (2026-10-03): JDK 21, SDK platform 35, build tools 35.0.0/35.0.1, ADB, emulator 35.4.9, and the pinned Gradle 8.11.1 wrapper are installed. A sandboxed invocation initially could not fetch the wrapper distribution; the configured wrapper succeeded when run with normal Gradle cache/network access.
+2. [x] Check attached devices with `adb devices -l` and list available virtual devices using the installed emulator-management tool. Evidence (2026-10-03): no attached devices; the owner-profile AVD list includes `Medium_Phone_API_36`, `Medium_Tablet`, `Pixel_8`, `Pixel_Tablet`, and `exploring_koufu_app`.
+3. [x] Identify a suitable development AVD. Evidence: existing `Medium_Phone_API_36` is listed and an Android 36 x86_64 Google APIs system image is installed; no AVD was created, started, or modified for the 0A gate. API 34+ meets the app's runtime requirement. No Google-account login is required for Phase 0 guest/offline tests. Do not wipe an existing personal device or unrelated AVD.
+4. [x] Start the selected AVD through command-line tooling, or use an owner-started device. Evidence (2026-10-03): a fresh temporary-data `Medium_Phone_API_36` instance booted headlessly as `emulator-5556`, API 36/x86_64, at 1080×2400 and 420 dpi. The existing AVD user data was not wiped or overwritten.
+5. [ ] Complete build, device, and reviewable evidence capture. The 0A build commands and current 0B/0C device scenarios passed on 2026-10-03, but labelled screenshots and lifecycle interaction evidence still need to be attached during 0F delivery.
+   - [x] With the selected device ready, run `gradlew.bat connectedDebugAndroidTest`. Evidence: the package assertion and 0C lifecycle suite passed on `emulator-5556` on 2026-10-03; signed-out/offline menu, settings persistence, new-game launch, and game-over persistence were also exercised. Later save scenarios and final visual evidence remain pending.
+6. [x] Record the reproducible launch/test commands and setup in [development.md](../docs/development.md). Local unit tests do not need a running emulator. Automated device scenarios must assert outcomes, not merely launch the app; use a small test harness for canvas game state alongside tests through real Android controls.
 
-The previous inspection found installed SDK/ADB/emulator executables, no attached device, and no AVD listed in the inspected environment; recheck at execution. If SDK downloads, license acceptance, hardware virtualization, Windows features, or device authorization actually require owner action, report the specific missing prerequisite and steps. Continue independent build/unit-test work while device setup is blocked. Do not mark device verification passed until it ran.
+The 2026-10-03 preflight found no attached device but did find existing API 34/36 AVDs in the owner profile. Recheck availability before device testing. If SDK downloads, license acceptance, hardware virtualization, Windows features, or device authorization actually require owner action, report the specific missing prerequisite and steps. Do not mark device verification passed until it ran.
 
 Setup references: [Android virtual device management](https://developer.android.com/studio/run/managing-avds), [command-line emulator startup](https://developer.android.com/studio/run/emulator-commandline), and [Android testing fundamentals](https://developer.android.com/training/testing/fundamentals).
 
@@ -69,12 +70,12 @@ Setup references: [Android virtual device management](https://developer.android.
 
 Tasks:
 
-1. [ ] Run `assembleDebug` and `testDebugUnitTest` from tracked inputs. The unit-test task succeeded on 2026-10-03; verify that result is repeatable. If the historical 94-error resource-symbol failure returns, inspect namespace, resource inputs, generated symbols/classes, and compiler classpath before selecting a fix; do not assume every referenced resource is absent.
-2. [ ] Fix only a demonstrated configuration/input failure. Do not hand-write `R.java`, remove Firebase configuration, rename the application ID, blanket-disable checks, or upgrade dependencies/platform levels without demonstrated necessity.
-3. [ ] Correct the stale instrumented application-package assertion. Keep the current Android/API boundary.
-4. [ ] Run `gradlew.bat assembleDebug` and `gradlew.bat testDebugUnitTest` from `android/`. Confirm a subsequent build succeeds without manually editing generated outputs. A targeted clean reproduction is appropriate if stale artifacts are part of the cause.
+1. [x] Run `assembleDebug` and `testDebugUnitTest` from tracked inputs. Evidence: both wrapper tasks succeeded before and after `clean` on 2026-10-03; the clean build recompiled app sources. The historical 94-error resource-symbol failure did not recur.
+2. [x] Check for a demonstrated configuration/input failure. None was reproduced; no build configuration, dependency, platform level, Firebase configuration, or application ID change was needed.
+3. [x] Correct the stale instrumented application-package assertion to `com.game.cookingspree`. Evidence: `assembleDebugAndroidTest` compiled and packaged successfully. The current Android/API boundary is unchanged.
+4. [x] Run `gradlew.bat assembleDebug` and `gradlew.bat testDebugUnitTest` from `android/` after `clean`. Both succeeded without manually editing generated outputs. `assembleDebugAndroidTest` also passed to verify the changed test source.
 
-- [ ] **0A gate:** both commands succeed repeatedly from tracked/configured inputs; any reproduced failure's root cause and fix are documented. Starter unit-test success is only a build gate, not gameplay evidence. If credentials or unavailable dependencies block recovery, identify the exact dependency and continue unaffected investigation.
+- [x] **0A gate:** both commands succeeded repeatedly from tracked/configured inputs; no project input failure was reproduced. Starter unit-test success is only a build gate, not gameplay evidence. Device/gameplay evidence remains pending for later slices.
 
 ## 0B — signed-out and unavailable-cloud safety
 
@@ -82,15 +83,15 @@ Tasks:
 
 Tasks:
 
-1. [ ] Make local preference/stat writes succeed independently of authentication and Firestore tasks. Obtain the current user once per update; skip cloud writes when absent and attach bounded, non-sensitive failure reporting when present. Avoid synchronously waiting for network operations.
-2. [ ] Make the initial joystick selection reflect the saved setting without treating programmatic hydration as a user edit. Verify both menu and game launch.
-3. [ ] Remove the static reference chain from `PrefsHelper` to an Activity. Use application-context storage and an Activity-free sync boundary, keeping credential prompts/dialogs activity-owned. Avoid replacing the leak with a static callback that captures the Activity.
-4. [ ] Contain Firebase initialization/task failures so guest gameplay/settings remain available. Inspect initialization separately from network failure; do not swallow arbitrary gameplay exceptions as an offline workaround.
-5. [ ] Remove preference dumps and all identified raw chef-name logging. Preserve useful redacted diagnostics.
+1. [x] Make local preference/stat writes succeed independently of authentication and Firestore tasks. Obtain the current user once per update; skip cloud writes when absent and attach bounded, non-sensitive failure reporting when present. Avoid synchronously waiting for network operations. Evidence: `LocalFirstWrite` null-user and simulated cloud-failure tests; writes use Firestore task failure listeners without waiting.
+2. [x] Make the initial joystick selection reflect the saved setting without treating programmatic hydration as a user edit. Verify both menu and game launch. Evidence: both layouts call the shared pre-listener hydrator; unit test confirms saved large selection precedes listener installation with no upload.
+3. [x] Remove the static reference chain from `PrefsHelper` to an Activity. Use application-context storage and an Activity-free sync boundary, keeping credential prompts/dialogs activity-owned. Avoid replacing the leak with a static callback that captures the Activity. Evidence: `PrefsHelper.init` stores `getApplicationContext()` preferences and `AccountManager.createSyncAdapter` captures only Firebase auth/database objects.
+4. [x] Contain Firebase initialization/task failures so guest gameplay/settings remain available. Inspect initialization separately from network failure; do not swallow arbitrary gameplay exceptions as an offline workaround. Evidence: initialization is guarded in `BaseActivity`/`AccountManager`; cloud task failures are logged by exception type only and the offline-safe seam passes deterministic tests.
+5. [x] Remove preference dumps and all identified raw chef-name logging. Preserve useful redacted diagnostics. Evidence: source search found no `PrefsDump` or chef-name log statements; profile and sync failure logs report exception type only.
 
-- [ ] **0B gate:** with no signed-in user and no network, fresh launch, joystick/volume changes, a complete game-over sequence, high score, average score, and games-played updates succeed locally. Restarting the app preserves local data. A simulated sync failure cannot abort those writes. No static owner retains a destroyed Activity, and raw profile values are absent from these log paths.
+- [x] **0B gate:** evidence (2026-10-03): on fresh temporary API 36 emulator data, signed-out airplane-mode menu/game launch succeeded; volume `19` and large joystick `1.4` survived restart; three natural expiries produced one game over, games played `1`, average score `0`, and an empty `GameSave`. `Phase0PersistenceTest` covers a nonzero high score and simulated cloud failure. Source review confirms the static preference owner retains application storage and an Activity-free adapter, and source/log review found no raw preference/profile values in the removed paths.
 
-- [ ] **0B tests:** null-user update, failed-sync/local-write independence, initial selection without upload, and game-over stats/save clearing. Use a small fake sync seam for deterministic tests; do not require a live Firebase account/backend for Phase 0 gates.
+- [x] **0B tests:** null-user update, failed-sync/local-write independence, initial selection without upload, and game-over stats/save clearing. Evidence: `Phase0PersistenceTest` passed all 5 tests with a fake sync/local stats seam and no live backend, as recorded in [development verification](../docs/development.md#current-verified-build-state).
 
 ## 0C — single session, cancellation, and render/input teardown
 
@@ -98,15 +99,15 @@ Tasks:
 
 Tasks:
 
-1. [ ] Select the normal/tutorial layout before composing components. Initialize exactly one manager, render binding, pot pool, and fetch/fill chain per active activity session; prevent tutorial superclass setup from creating a hidden first game.
-2. [ ] Expose idempotent close/cancel operations. Reject work after closure, stop handlers, interrupt sleeping/queue-waiting work, and exit interrupted tasks before food creation, basket mutation, or callbacks. Dispose the filler through its owning fetcher.
-3. [ ] Replace the pot-to-`GameActivity` cast with a narrow listener. Suppress queued UI callbacks after session closure as well as worker callbacks; a main-thread runnable already posted needs the same ownership check.
-4. [ ] Give the render loop safely published state, null/init protection, prompt interrupt exit, and bounded teardown. Prevent a new surface from launching a second loop while the old one remains active; do not hold game-state locks while joining workers.
-5. [ ] Cancel all held-direction callbacks on pause/stop/destruction and handle simultaneous direction touches without orphaning a self-reposting runnable. Reset held movement at the same boundary.
+- [x] Select the normal/tutorial layout before composing components. Initialize exactly one manager, render binding, pot pool, and fetch/fill chain per active activity session; prevent tutorial superclass setup from creating a hidden first game. Evidence: `TutorialActivity` selects its layout through the superclass hook; the connected tutorial-entry test confirmed one composition and a manager close on two entry/exit cycles on API 36.
+- [x] Expose idempotent close/cancel operations. Reject work after closure, stop handlers, interrupt sleeping/queue-waiting work, and exit interrupted tasks before food creation, basket mutation, or callbacks. Dispose the filler through its owning fetcher. Evidence: focused tests cover repeated callback-gate closure, interrupted cooking without food/callback, and an interrupted blocked consumer; source review confirms the fetcher closes its owned filler/queue and the pool shuts down with interruption.
+- [x] Replace the pot-to-`GameActivity` cast with a narrow listener. Suppress queued UI callbacks after session closure as well as worker callbacks; a main-thread runnable already posted needs the same ownership check. Evidence: `Pot` receives `PotFunctions.PotListener`; the callback-gate regression test executes an already-posted callback after closure and observes no call.
+- [x] Give the render loop safely published state, null/init protection, prompt interrupt exit, and bounded teardown. Prevent a new surface from launching a second loop while the old one remains active; do not hold game-state locks while joining workers. Evidence: `GameView` uses volatile references, refuses duplicate live loops, checks null state, and joins for at most 300 ms; `testDebugUnitTest` and `assembleDebug` passed. The connected API 36 scenario detached and reattached the actual surface five times and observed at most one concurrent render loop.
+- [x] Cancel all held-direction callbacks on pause/stop/destruction and handle simultaneous direction touches without orphaning a self-reposting runnable. Reset held movement at the same boundary. Evidence: per-control runnable tracking and lifecycle cancellation are in `GameActivity`; the two-direction release regression test confirms the remaining held direction stays active.
 
-- [ ] **0C gate:** repeated game/tutorial entry/exit leaves one active session and no old spawning/ticking/fetching/cooking work. Closing during cooking, fetching, or a blocked queue produces no late session mutation or UI callback. Surface recreation leaves one render loop; teardown has a defined bound and does not hang the UI.
+- [x] **0C gate:** repeated game/tutorial entry/exit leaves one active session and no old spawning/ticking/fetching/cooking work. Closing during cooking, fetching, or a blocked queue produces no late session mutation or UI callback. Surface recreation leaves one render loop; teardown has a defined bound and does not hang the UI. Evidence: on `emulator-5556` (Medium_Phone_API_36, API 36), the connected suite passed 5/5 on 2026-10-03. It repeated tutorial entry/exit twice, closed separate game sessions during an active fetch and cook within the five-second owner bound, checked ingredient/order snapshots and delivered UI callbacks after closure (including beyond the 13-second maximum order-spawn delay and six-second cooking duration), closed a blocked filler consumer in unit coverage, and detached/reattached the actual surface five times while observing one concurrent render loop and bounded teardown.
 
-- [ ] **0C tests:** idempotent closure, interrupted cook without food/callback, interrupted consumer without continuation, closed-owner callback suppression, two-direction press/release, and tutorial initialization count. Device lifecycle checks verify destruction/recreation; garbage collection timing alone is not proof of cleanup.
+- [x] **0C tests:** idempotent closure, interrupted cook without food/callback, interrupted consumer without continuation, closed-owner callback suppression, two-direction press/release, and tutorial initialization count. Evidence: all 13 `Phase0PersistenceTest` cases passed, including interruption of resumed cooking; `connectedDebugAndroidTest` passed 5/5 on `emulator-5556` (Medium_Phone_API_36, API 36), including two tutorial cycles, active fetch/cook closure, and five surface recreations. No garbage-collection timing is used as cleanup evidence.
 
 ## 0D — consistent pause and tutorial lifecycle
 

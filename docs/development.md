@@ -11,7 +11,7 @@ Purpose: get a reproducible local build/test loop. Gradle configuration is autho
 
 ## Emulator/device setup
 
-Phase 0 includes an agent-owned [test environment checklist](../plans/phase-0-baseline-recovery.md#test-environment-setup--begin-with-0a). The agent first inspects installed SDK/JDK tools, attached devices, and existing AVDs, then reuses or creates a dedicated compatible test AVD. Compilation needs SDK platform 35; device tests need API 34+. An API 35 test image is the initial plan target, without requiring Google-account sign-in for guest/offline checks.
+Phase 0 includes an agent-owned [test environment checklist](../plans/phase-0-baseline-recovery.md#test-environment-setup--begin-with-0a). Compilation needs SDK platform 35; device tests need API 34+. On 2026-10-03, the inspected environment had JDK 21, SDK platform 35, build tools 35.0.0/35.0.1, ADB, and emulator 35.4.9. The owner-profile AVD list included `Medium_Phone_API_36` (Android 36) and `Pixel_8` (Android 34); no device was attached. No AVD was started or changed for the 0A build gate. An API 35 test image remains the initial plan target if a new AVD is needed later, without requiring Google-account sign-in for guest/offline checks.
 
 Android Studio is a convenient way to create/start a device: open Device Manager, create a phone AVD with an appropriate API 35 image if needed, and start it. It does not need to remain open when the emulator is launched independently through command-line tooling. See [AVD management](https://developer.android.com/studio/run/managing-avds) and [emulator command-line startup](https://developer.android.com/studio/run/emulator-commandline).
 
@@ -33,9 +33,11 @@ The last command needs a running emulator or connected device. The committed uni
 
 ## Current verified build state
 
-On 2026-10-03, `.\gradlew.bat testDebugUnitTest` completed successfully from `android/`, including resource processing, Java compilation, and the local unit-test task. The build emitted non-fatal warnings for the manifest's legacy `package` attribute, deprecated API use, and unchecked operations. The committed tests are still starter coverage, and no emulator/device validation was performed by this check.
+On 2026-10-03, after Phase 0 slice 0B changes, `testDebugUnitTest` and `assembleDebug` succeeded from `android/`. The focused `Phase0PersistenceTest` exercises null-user skipping, local-write survival after a simulated cloud failure, upload-free cache hydration, joystick selection ordering, and game-over stats/save clearing. Those automated checks used neither a live Firebase backend nor a device; the separate device run below covers the signed-out airplane-mode and restart-persistence behavior.
 
-The device test's expected package name is also stale (`com.example.com.game.com.game.cookingspree` rather than the configured `com.game.cookingspree`); correct it when making the test suite meaningful.
+Also on 2026-10-03, `connectedDebugAndroidTest` passed on a fresh temporary-data `Medium_Phone_API_36` AVD (`emulator-5556`, API 36, x86_64, 1080×2400 at 420 dpi). With airplane mode enabled and no signed-in user, the menu and a new game launched successfully. Changing volume to `19` and joystick size to large (`1.4`) persisted across an app restart. Letting three orders expire produced one game-over path; local games played became `1`, average score remained `0`, and `GameSave` was empty after completion. The nonzero high-score calculation and simulated cloud failure remain covered by `Phase0PersistenceTest`; no live backend was required.
+
+On 2026-10-03, `clean`, `assembleDebug`, `testDebugUnitTest`, and `assembleDebugAndroidTest` completed successfully from `android/` using the configured Gradle 8.11.1 wrapper. The app and unit-test tasks succeeded after clearing generated build outputs, so they were rebuilt from tracked project inputs. The instrumentation APK compiled with the corrected expected package name `com.game.cookingspree`, matching the configured application ID. The build emitted non-fatal warnings for the manifest's legacy `package` attribute, deprecated API use, and unchecked operations. That clean 0A baseline did not itself run on a device; the subsequent API 36 device validation is recorded above and in [runtime architecture](architecture.md#concurrency-boundaries).
 
 ## Manual smoke test
 

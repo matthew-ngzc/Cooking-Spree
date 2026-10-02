@@ -21,45 +21,13 @@ public class TutorialActivity extends GameActivity {
     private List<TutorialStep> tutorialSteps;
 
     @Override
+    protected int getGameLayoutResource() { return R.layout.activity_tutorial; }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        // Set tutorial layout instead of game layout
-        setContentView(R.layout.activity_tutorial);
-
-        // Re-initialize components after setting tutorial layout
-        reinitializeComponents();
-
         // Initialize tutorial UI
         initializeTutorial();
-    }
-
-    private void reinitializeComponents() {
-        // Since we changed the layout, we need to reinitialize some components
-        try {
-            // Re-setup joystick
-            setupJoystickSizeListener(
-                    findViewById(R.id.joystickSizeGroup),
-                    R.id.smallSize,
-                    R.id.largeSize,
-                    scale -> applyJoystickScale(findViewById(android.R.id.content))
-            );
-
-            // Re-setup audio
-            if (mediaPlayer != null) {
-                mediaPlayer.release();
-            }
-            mediaPlayer = setupMediaPlayer(R.raw.overcooked);
-            setupVolumeSeekBar(findViewById(R.id.volumeSeekBar), mediaPlayer);
-
-            // Re-initialize game components
-            initializeGameComponents();
-            setupInteractButton();
-            setupPauseMenuButtons();
-
-        } catch (Exception e) {
-            Log.e("TutorialActivity", "Error reinitializing components: " + e.getMessage(), e);
-        }
     }
 
     private void initializeTutorial() {
@@ -212,11 +180,6 @@ public class TutorialActivity extends GameActivity {
         // For now, let's continue in tutorial mode
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-    }
-
     // Simple tutorial step class
     private static class TutorialStep {
         private final String description;
@@ -238,7 +201,7 @@ public class TutorialActivity extends GameActivity {
 
             // Disable pause button during tutorial
             Button togglePauseButton = findViewById(R.id.togglePauseButton);
-            if (togglePauseButton != null && currentStep < tutorialSteps.size()) {
+            if (togglePauseButton != null) {
                 togglePauseButton.setVisibility(View.GONE);
             }
         } catch (Exception e) {

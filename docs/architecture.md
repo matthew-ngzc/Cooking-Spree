@@ -6,15 +6,15 @@ Purpose: make structural changes to the Android app, custom game engine, map, re
 
 ```text
 MainActivity ──> GameActivity / TutorialActivity
-                    │
+                    │  choose layout, then compose one activity session
                     ├─ GameManager ──> orders, timer ticks, score, game-over callbacks
-                    ├─ GameView ─────> Game draw/update loop on custom SurfaceView
+                    ├─ GameView ─────> one interruptible draw/update loop per surface
                     └─ Game ─────────> map, Player, interactables, collision
-                                      ├─ Pots (shared PotThreadPool)
-                                      └─ Baskets (BasketManager + fetch/fill workers)
+                                      ├─ Pots (session PotThreadPool)
+                                      └─ Baskets (BasketManager + fetcher-owned filler/queue)
 ```
 
-`GameActivity.initializeGameComponents()` composes these objects and acts as the listener for `GameManager`, ingredient fetching, basket filling, and pot progress. Android XML layouts are overlays around `GameView`; canvas objects are not Android views.
+`GameActivity` selects the layout before composing its session. `TutorialActivity` overrides the layout choice, so the superclass composes directly against the tutorial layout and does not create a hidden game first. A one-shot composition guard protects manager, render binding, pot pool, and fetch/fill ownership. Android XML layouts are overlays around `GameView`; canvas objects are not Android views.
 
 ## Map and rendering
 
@@ -34,16 +34,23 @@ MainActivity ──> GameActivity / TutorialActivity
 | Basket contents / available ingredients | `BasketManager`, `IngredientFetchWorker` | Fetcher uses a producer/consumer queue to refill baskets. |
 | Orders, score, failures, pause | `GameManager` | Main-thread handlers schedule spawning and 16-ms ticks. |
 | Activity/HUD state | `GameActivity` | Receives callbacks and updates Android views. |
+| Session workers | Owning activity session | Activity close stops manager handlers, interrupts the pot pool and fetcher, and the fetcher closes its filler and queue. |
 
 ## Concurrency boundaries
 
-`GameManager` handlers run on the main looper, while `PotThreadPool`, `IngredientFetchWorker`, and `IngredientBasketFiller` use executors. Several classes use locks and return defensive copies. UI changes initiated by a worker must return to the main thread; retain this boundary when refactoring. Ensure executors/handlers do not retain a destroyed activity.
+`GameManager` handlers run on the main looper, while `PotThreadPool`, `IngredientFetchWorker`, and `IngredientBasketFiller` use executors. Closing an owner is idempotent, prevents later submissions, removes manager callbacks, and interrupts sleeps and queue waits. The fetcher owns and closes its filler; queue closure wakes both producer and consumer waiters. Interrupted cooking exits before producing food or reporting progress. The pot receives a narrow `PotFunctions.PotListener`, not an Activity cast.
+
+Worker UI callbacks post through a session gate and check it again when the main-thread runnable executes. A callback already in the message queue is therefore discarded after activity destruction. Held-direction callbacks are tracked per control and all removed on pause, stop, and destruction; releasing one of two held controls leaves the other active.
+
+The render thread reads safely published `Game` and run-state references, tolerates an uninitialized game, and exits when interrupted. Surface destruction interrupts it and joins for at most 300 ms outside game-state locks. A new surface does not start a second loop while the prior thread is still alive; if that thread exits after the new surface is available, it starts the replacement loop. Activity destruction permanently closes the renderer. Garbage-collection timing is not used as evidence of worker cleanup.
+
+On 2026-10-03, `testDebugUnitTest`, `assembleDebug`, and `assembleDebugAndroidTest` passed after these lifecycle changes. `connectedDebugAndroidTest` passed 5/5 tests on `emulator-5556` (Medium_Phone_API_36, API 36). It verified two tutorial entry/exit cycles with one composition and manager closure, bounded activity teardown during a live ingredient fetch and live pot cook, no late ingredient/order/UI changes after closure, and five actual `GameView` surface detach/reattach cycles with one render loop at a time. Each surface teardown completed within the test's two-second allowance; activity teardown closed all session owners within five seconds.
 
 ## High-risk seams
 
 - The map's external TSX paths/names, JSON object properties, Java switch cases, and asset filenames are a single integration seam.
 - `GameActivity` serializes directly against object ordering (tables, pots, baskets); map reordering can silently remap saved state.
-- `Pot` casts its `Context` to `GameActivity` for progress updates, so it is not reusable with another context as written.
+- Session ownership and closure span the manager, renderer, cooking pool, fetcher, and its filler; future asynchronous owners must join this close boundary.
 - `Recipe` identity is name-based at submission/save boundaries; rename migrations need compatibility handling.
 
 ## Source navigation

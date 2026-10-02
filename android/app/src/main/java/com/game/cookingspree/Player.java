@@ -9,11 +9,11 @@ public class Player {
     private final PlayerInventory inventory;
     private final Bitmap sprite;
     private Bitmap scaledSprite;
-    private float x, y;
-    private float targetX, targetY;
-    private boolean isMoving = false;
-    private int queuedDX = 0, queuedDY = 0;
-    private boolean movementHeld = false;
+    private volatile float x, y;
+    private volatile float targetX, targetY;
+    private volatile boolean isMoving = false;
+    private volatile int queuedDX = 0, queuedDY = 0;
+    private volatile boolean movementHeld = false;
     private final int tileSize;
     private final Game game;
 

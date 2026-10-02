@@ -18,11 +18,14 @@ The save format is manually keyed in `GameActivity.saveGameState()` and `loadGam
 
 Expected Firestore document: `chefs/{uid}` with `profile`, `stats`, and `settings` nested maps. The code also sketches social/following functionality, but it is not a complete feature.
 
-`BaseActivity.onCreate()` calls `PrefsHelper.init(context, new AccountManager(this))`. `PrefsHelper` writes locally then calls `AccountManager.update…`; those update methods dereference `getCurrentUser()` and therefore require careful signed-out/offline handling. The original plan says Firebase may have expired and the feature needs validation; do not present cloud sync as production-ready.
+`BaseActivity.onCreate()` initializes `PrefsHelper` with the application context and an Activity-free cloud sync adapter. Credential prompts remain owned by the foreground `MainActivity`'s `AccountManager`; the static preference helper does not retain an Activity. Preference and aggregate-stat setters commit to `chef_prefs` first, then request an asynchronous cloud update only when a current Firebase user exists. Synchronous adapter failures and asynchronous Firestore task failures produce a bounded diagnostic containing only the exception type. Remote cache hydration suppresses those upload calls, so loading account values is not treated as a user edit. Firebase initialization or sync failure leaves the local guest path available. Cloud sync remains optional and is not presented as production-ready.
+
+The initial joystick radio selection is hydrated from the local setting before its user-change listener is installed, in both the menu settings and game settings. Completing a game updates local high score, average score, and games played, then clears `GameSave`; the focused unit seam uses a fake local stats store and does not require Firebase.
 
 ## Change checklist
 
 - Maintain a local-first outcome for settings/gameplay data unless the user explicitly changes the product decision.
+- Keep optional Firebase writes asynchronous and signed-out safe; local writes must not depend on cloud task success.
 - Test signed-out, no-network, first sign-in, returning sign-in, and failed Firebase requests when changing account code.
 - Avoid logging identity tokens, UIDs, email addresses, or raw preference dumps.
 - Document any schema change here, including migration and rollback behavior.

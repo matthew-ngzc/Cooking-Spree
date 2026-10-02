@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class IngredientBasketFiller {
     //Fills baskets off IngredientFetchWorker's input into Ingredient Queue
@@ -15,6 +17,9 @@ public class IngredientBasketFiller {
     private final IngredientQueue queue;
     private final BasketManager basketManager;
     private final int fillSize;
+    private final AtomicBoolean closed = new AtomicBoolean();
+    private final Object mutationLock = new Object();
+    private volatile boolean waitingForIngredient;
 
     public interface BasketFillListener{
         void finishedBasketFilling(List<Ingredient> fillOrder);
@@ -27,6 +32,8 @@ public class IngredientBasketFiller {
     }
 
     public void startFilling(BasketFillListener listener) {
+        if (closed.get()) return;
+        try {
             executor.submit(() -> {
                 List<Ingredient> fillOrder=new ArrayList<>();
 
@@ -34,13 +41,21 @@ public class IngredientBasketFiller {
                         // Take ingredient from queue (blocks if no ingredient inside)
                          Ingredient ingredient=null;
                          try {
+                             waitingForIngredient = true;
                              ingredient = queue.take();
-                         } catch (Exception e) {
-                             Log.e(TAG, "Exception during take()", e);
+                         } catch (InterruptedException e) {
+                             Thread.currentThread().interrupt();
+                             return;
+                         } finally {
+                             waitingForIngredient = false;
                          }
 
+                         if (closed.get() || Thread.currentThread().isInterrupted()) return;
                          if (ingredient!=null){
-                             basketManager.updateBasketContents(i, ingredient);
+                             synchronized (mutationLock) {
+                                 if (closed.get() || Thread.currentThread().isInterrupted()) return;
+                                 basketManager.updateBasketContents(i, ingredient);
+                             }
 
                              Log.d(TAG, "filled basket with: " + ingredient.getName() + " at basket " + i);
                              fillOrder.add(ingredient);
@@ -48,7 +63,24 @@ public class IngredientBasketFiller {
                              Log.e(TAG,"Failed to add an ingredient at basket"+i);
                          }
                 }
-                listener.finishedBasketFilling(fillOrder);
+                if (!closed.get() && !Thread.currentThread().isInterrupted() && listener != null) {
+                    listener.finishedBasketFilling(fillOrder);
+                }
             });
+        } catch (RejectedExecutionException ignored) {
+            // Closure won the race with submission.
+        }
     }
+
+    public void close() {
+        synchronized (mutationLock) {
+            if (!closed.compareAndSet(false, true)) return;
+        }
+        queue.close();
+        executor.shutdownNow();
+    }
+
+    boolean isWaitingForIngredientForTest() { return waitingForIngredient; }
+    boolean isClosed() { return closed.get(); }
+    boolean isTerminatedForTest() { return executor.isTerminated(); }
 }
