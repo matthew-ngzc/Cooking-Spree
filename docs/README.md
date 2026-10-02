@@ -16,6 +16,7 @@ Purpose: route an agent to the smallest document needed to work safely. This dir
 | See the long-term goal, phase summaries, and links to phase plans and ideas | [Overarching Android roadmap](../plans/android-roadmap.md) |
 | Execute the detailed Phase 0 baseline recovery contract | [Phase 0 plan](../plans/phase-0-baseline-recovery.md) |
 | Record or evaluate a material product/technical decision | [decisions/README.md](decisions/README.md); [repository layout](decisions/0004-project-root-repository.md); [proposed Phase 0 boundaries](decisions/0003-phase-zero-session-and-save-boundaries.md) |
+| Understand the accepted Android project directory name | [ADR 0005 — Android project directory](decisions/0005-android-project-directory.md) |
 | See the evidence behind the agent workflow | [research/matt-pocock-agentic-workflow.md](research/matt-pocock-agentic-workflow.md) |
 | Read the repository review, corrected against current code on 2026-10-01 | [reports/2026-09-21-repository-review.md](reports/2026-09-21-repository-review.md) |
 | Finish a change without leaving docs stale | [doc-maintenance.md](doc-maintenance.md) |
@@ -31,10 +32,10 @@ Cooking Spree is a landscape Android single-player cooking game. The player move
 
 | Location | Purpose |
 | --- | --- |
-| `Code/` | Android Gradle project; all runnable app code. Run Gradle here; Git is rooted at the project root. |
-| `Code/app/src/main/java/com/game/cookingspree/` | Java activities, game loop, domain objects, interactions, and Firebase helpers. |
-| `Code/app/src/main/res/` | Android layouts, UI drawables, audio, strings, and themes. |
-| `Code/app/src/main/assets/` | Runtime Tiled map and canvas tile images. |
+| `android/` | Android Gradle project; all runnable app code. Run Gradle here; Git is rooted at the project root. |
+| `android/app/src/main/java/com/game/cookingspree/` | Java activities, game loop, domain objects, interactions, and Firebase helpers. |
+| `android/app/src/main/res/` | Android layouts, UI drawables, audio, strings, and themes. |
+| `android/app/src/main/assets/` | Runtime Tiled map and canvas tile images. |
 | `Tiled stuff/` | Tiled authoring map and TSX tile metadata. |
 | `new sprites/` | Source sprite artwork. |
 | `plans/COOKING SPREE future plans.md` | Original, unprioritised backlog; see the distilled notes in `roadmap.md`. |

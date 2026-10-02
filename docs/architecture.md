@@ -18,7 +18,7 @@ MainActivity ──> GameActivity / TutorialActivity
 
 ## Map and rendering
 
-- Runtime map: `Code/app/src/main/assets/map.tmj`; authoring counterpart: `Tiled stuff/map.tmj`.
+- Runtime map: `android/app/src/main/assets/map.tmj`; authoring counterpart: `Tiled stuff/map.tmj`. The project directory naming decision is recorded in [ADR 0005](decisions/0005-android-project-directory.md).
 - `Game.loadMapFromJson()` reads the `Floor` tile layer and `Interactables` object layer, finds spawn tile GID `2`, and instantiates objects from their `type` property.
 - It maps only the listed external tilesets to runtime sprites in code. Map object properties provide each interactable's sprites and pot settings.
 - `Game.draw()` paints floor, interactables, then player onto the canvas. `GameView` runs the update/draw loop; `Game.getSleepTime()` targets 16 ms.

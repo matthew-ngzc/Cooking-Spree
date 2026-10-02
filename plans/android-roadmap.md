@@ -49,4 +49,4 @@ A phase is complete only when its criteria are met, automated and manual evidenc
 - [Documentation index](../docs/README.md): canonical project documentation navigation.
 - [Repository layout decision](../docs/decisions/0004-project-root-repository.md): project-root Git and canonical documentation placement.
 
-The project root is the Git repository; `Code/` contains the Android Gradle project. The canonical documentation and phase contracts are committed together with app code, so PR reviewers can read the complete project context in one repository.
+The project root is the Git repository; `android/` contains the Android Gradle project, as recorded in [ADR 0005](../docs/decisions/0005-android-project-directory.md). The canonical documentation and phase contracts are committed together with app code, so PR reviewers can read the complete project context in one repository.

@@ -4,7 +4,7 @@ Purpose: hold short, durable records of material decisions so agents do not redi
 
 Create an ADR for decisions affecting product commitments, architecture, persistence compatibility, platform scope, online/multiplayer design, security, deployment, or repository structure. The user has final approval: use `Proposed` until they explicitly accept it.
 
-Current accepted repository-structure decision: [ADR 0004 — Project-root repository](0004-project-root-repository.md).
+Accepted repository-structure decisions: [ADR 0004 — Project-root repository](0004-project-root-repository.md) records the historical move to one root repository; [ADR 0005 — Android project directory](0005-android-project-directory.md) records the current Android project directory name.
 
 ## Format
 

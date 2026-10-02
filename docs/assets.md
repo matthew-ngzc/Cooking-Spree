@@ -17,7 +17,7 @@ The product owner provides the chosen generated file. Store its source prompt, g
 ## Current locations
 
 - Source artwork: `new sprites/`.
-- Runtime canvas tiles: `Code/app/src/main/assets/tiles/`.
-- Android UI drawables: `Code/app/src/main/res/drawable/`.
+- Runtime canvas tiles: `android/app/src/main/assets/tiles/`.
+- Android UI drawables: `android/app/src/main/res/drawable/`.
 
 Do not overwrite a current asset without retaining a recoverable source or receiving explicit product-owner approval.

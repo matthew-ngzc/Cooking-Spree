@@ -32,10 +32,10 @@ Every behavior, architecture, build, test, persistence, map, asset, or workflow 
 
 ## Project boundaries
 
-- This is a native Android Java game in `Code/`; run Gradle commands from that directory.
-- Preserve `Code/app/google-services.json`; it is Firebase configuration. Do not reproduce its contents in documentation, logs, or commits.
-- `Tiled stuff/` is map-authoring source; `Code/app/src/main/assets/map.tmj` is the runtime map. Keep them deliberately synchronised when map work is requested.
-- `new sprites/` is source artwork; runtime map assets are in `Code/app/src/main/assets/tiles/`, while Android UI artwork is in `Code/app/src/main/res/drawable/`.
+- This is a native Android Java game in `android/`; run Gradle commands from that directory.
+- Preserve `android/app/google-services.json`; it is Firebase configuration. Do not reproduce its contents in documentation, logs, or commits.
+- `Tiled stuff/` is map-authoring source; `android/app/src/main/assets/map.tmj` is the runtime map. Keep them deliberately synchronised when map work is requested.
+- `new sprites/` is source artwork; runtime map assets are in `android/app/src/main/assets/tiles/`, while Android UI artwork is in `android/app/src/main/res/drawable/`.
 - This project is one Git repository rooted here. Run Git commands from this project root.
 - Canonical project guidance and documentation live at this root under `AGENTS.md`, `docs/`, and `plans/`.
 

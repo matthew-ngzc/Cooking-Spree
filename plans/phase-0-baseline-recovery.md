@@ -34,7 +34,7 @@ For each slice, the orchestrator gives Luna the slice ID, required readings, bou
 
 Use the `gpt-6-luna` agent for implementation when execution is requested. No agent or separate chat is launched by this planning step. Read the project-root `AGENTS.md` before execution.
 
-The project root is the Git repository and `Code/` is the Android Gradle project. Run Git from the root and Gradle from `Code/`. Before mutation, inspect the branch, status, and applicable instructions; preserve unrelated changes. Do not claim the tree is clean without checking it. Canonical plans and docs are in this repository and are included in the same PR as implementation changes.
+The project root is the Git repository and `android/` is the Android Gradle project, as recorded in [ADR 0005](../docs/decisions/0005-android-project-directory.md). Run Git from the root and Gradle from `android/`. Before mutation, inspect the branch, status, and applicable instructions; preserve unrelated changes. Do not claim the tree is clean without checking it. Canonical plans and docs are in this repository and are included in the same PR as implementation changes.
 
 ## Test environment setup — begin with 0A
 
@@ -44,29 +44,29 @@ Environment setup is part of execution, not an assumed owner prerequisite. The a
 2. Check attached devices with `adb devices -l` and list available virtual devices using the installed emulator-management tool. Inspect the owner's AVD location explicitly if the execution environment uses a different Windows user/profile; an empty list under a sandbox profile does not prove no owner AVD exists.
 3. Reuse a suitable development AVD/device. If none exists, create a dedicated Cooking Spree test AVD using an API 35 system image compatible with the host; API 34+ is the app's runtime requirement. Install only missing development packages needed for this setup. No Google-account login is required for Phase 0 guest/offline tests. Do not wipe an existing personal device or unrelated AVD.
 4. Start the AVD through command-line tooling, or use an owner-started device. Android Studio does not need to remain open. Wait for ADB to report the selected device ready and confirm Android has completed booting. Record its serial, API level, image, and relevant display configuration; select one explicit target if several devices are connected.
-5. After build recovery, run `gradlew.bat assembleDebug` and `gradlew.bat testDebugUnitTest` from `Code/`. With the selected device ready, run `gradlew.bat connectedDebugAndroidTest`; build/run the app for the acceptance scenarios. Capture test reports, relevant redacted logs, and screenshots for device/visual failures. Establish controlled guest/offline state on the dedicated test device without resetting the owner's data.
+5. After build recovery, run `gradlew.bat assembleDebug` and `gradlew.bat testDebugUnitTest` from `android/`. With the selected device ready, run `gradlew.bat connectedDebugAndroidTest`; build/run the app for the acceptance scenarios. Capture test reports, relevant redacted logs, labelled screenshots of materially changed scenes and key acceptance states, and short recordings or screenshot sequences where interaction/lifecycle behavior cannot be demonstrated by a still image. Capture additional screenshots for device/visual failures. Establish controlled guest/offline state on the dedicated test device without resetting the owner's data.
 6. Record the reproducible launch/test commands and any required setup in `docs/development.md` and repository documentation. Local unit tests do not need a running emulator. Automated device scenarios must assert outcomes, not merely launch the app; use a small test harness for canvas game state alongside tests through real Android controls.
 
 The previous inspection found installed SDK/ADB/emulator executables, no attached device, and no AVD listed in the inspected environment; recheck at execution. If SDK downloads, license acceptance, hardware virtualization, Windows features, or device authorization actually require owner action, report the specific missing prerequisite and steps. Continue independent build/unit-test work while device setup is blocked. Do not mark device verification passed until it ran.
 
 Setup references: [Android virtual device management](https://developer.android.com/studio/run/managing-avds), [command-line emulator startup](https://developer.android.com/studio/run/emulator-commandline), and [Android testing fundamentals](https://developer.android.com/training/testing/fundamentals).
 
-## 0A — reproduce and repair the build
+## 0A — verify and stabilise the build
 
-**Dependencies:** none. **Files:** `Code/app/build.gradle.kts`, project Gradle configuration/wrapper, version catalogue, and only source/resource files demonstrated to cause compilation failure. Documentation: `docs/development.md`.
+**Dependencies:** none. **Files:** `android/app/build.gradle.kts`, project Gradle configuration/wrapper, version catalogue, and only source/resource files demonstrated to cause compilation failure. Documentation: `docs/development.md`.
 
 Tasks:
 
-1. Reproduce the 94-error resource-symbol failure and inspect namespace, resource inputs, generated symbols/classes, and compiler classpath. Record the actual cause before selecting a fix; do not assume every referenced resource is absent.
-2. Fix the responsible configuration/input. Do not hand-write `R.java`, remove Firebase configuration, rename the application ID, blanket-disable checks, or upgrade dependencies/platform levels without demonstrated necessity.
+1. Run `assembleDebug` and `testDebugUnitTest` from tracked inputs. The unit-test task succeeded on 2026-10-03; verify that result is repeatable. If the historical 94-error resource-symbol failure returns, inspect namespace, resource inputs, generated symbols/classes, and compiler classpath before selecting a fix; do not assume every referenced resource is absent.
+2. Fix only a demonstrated configuration/input failure. Do not hand-write `R.java`, remove Firebase configuration, rename the application ID, blanket-disable checks, or upgrade dependencies/platform levels without demonstrated necessity.
 3. Correct the stale instrumented application-package assertion. Keep the current Android/API boundary.
-4. Run `gradlew.bat assembleDebug` and `gradlew.bat testDebugUnitTest` from `Code/`. Confirm a subsequent build succeeds without manually editing generated outputs. A targeted clean reproduction is appropriate if stale artifacts are part of the cause.
+4. Run `gradlew.bat assembleDebug` and `gradlew.bat testDebugUnitTest` from `android/`. Confirm a subsequent build succeeds without manually editing generated outputs. A targeted clean reproduction is appropriate if stale artifacts are part of the cause.
 
-**Gate:** both commands succeed from tracked/configured inputs; root cause and fix are documented. Starter unit-test success is only a build gate, not gameplay evidence. If credentials or unavailable dependencies block recovery, identify the exact dependency and continue unaffected investigation.
+**Gate:** both commands succeed repeatedly from tracked/configured inputs; any reproduced failure's root cause and fix are documented. Starter unit-test success is only a build gate, not gameplay evidence. If credentials or unavailable dependencies block recovery, identify the exact dependency and continue unaffected investigation.
 
 ## 0B — signed-out and unavailable-cloud safety
 
-**Dependencies:** 0A. **Files:** `BaseActivity.java`, `MainActivity.java`, `AccountManager.java`, `util/PrefsHelper.java`, `GameActivity.java` stat completion paths, and focused tests under `Code/app/src/test/` or `androidTest/`. Java paths are under `Code/app/src/main/java/com/game/cookingspree/`. Documentation: `docs/persistence.md`.
+**Dependencies:** 0A. **Files:** `BaseActivity.java`, `MainActivity.java`, `AccountManager.java`, `util/PrefsHelper.java`, `GameActivity.java` stat completion paths, and focused tests under `android/app/src/test/` or `androidTest/`. Java paths are under `android/app/src/main/java/com/game/cookingspree/`. Documentation: `docs/persistence.md`.
 
 Tasks:
 
@@ -131,13 +131,13 @@ Tasks:
 
 ## 0F — integration evidence and delivery
 
-**Dependencies:** 0A–0E. **Files:** meaningful tests under `Code/app/src/test/` and `Code/app/src/androidTest/`; documentation and PR template only unless verification exposes an in-scope defect.
+**Dependencies:** 0A–0E. **Files:** meaningful tests under `android/app/src/test/` and `android/app/src/androidTest/`; documentation and PR template only unless verification exposes an in-scope defect.
 
 1. Replace the arithmetic starter with regression coverage for exact recipe matching (duplicate potatoes included), wrong/extra ingredients, order expiry, completion points/streak reset, and three-failure finalization. Add deterministic clock/sync seams only where needed; retain the current documented balance. Correct resource/package smoke checks where useful.
 2. Run `gradlew.bat assembleDebug` and `gradlew.bat testDebugUnitTest`. With an attached API 34+ emulator/device, run `gradlew.bat connectedDebugAndroidTest`. Record command, result, date, device/API for device checks, and the behavior each test protects. A skipped check is not a pass.
 3. Complete the smoke matrix below offline/signed out. Repeat lifecycle entry/exit and surface recreation checks at least five times. Test game-over save/stat behavior both from a new session and from a loaded one.
 4. Update the owning documentation with actual final behavior, commands, limitations, and accepted decisions. Mark individual report findings resolved only with a source/test reference and date; keep deferred findings visible. Do not rewrite the report as if the original findings never existed.
-5. Review all Luna changes against this contract, confirm no accidental configuration/asset exposure, and prepare a PR using `.github/pull_request_template.md`. Include changelog, reason, material trade-offs, evidence, relevant decisions, and deferred risks. Commit messages follow Conventional Commits. The owner approves the PR; do not merge automatically.
+5. Review all Luna changes against this contract, confirm no accidental configuration/asset exposure, and prepare a PR using `.github/pull_request_template.md`. Include changelog, reason, material trade-offs, relevant decisions, deferred risks, command/test results, and device evidence. Attach labelled screenshots for every materially changed scene, using before/after views when useful; attach a short recording or concise screenshot sequence for interaction or lifecycle behavior that a still image cannot prove. Record the device/emulator and API level, note any unverified scenario, and redact sensitive data. Commit messages follow Conventional Commits. The owner approves the PR; do not merge automatically.
 
 **Gate:** evidence supports every Phase 0 criterion and the owner approves the PR. Without device evidence, status is implementation complete/device verification pending, not Phase 0 complete.
 
@@ -169,4 +169,4 @@ Tasks:
 
 ## Ready-to-use Luna slice handoff
 
-> Implement Phase 0 slice **[0A–0F]** from the approved `plans/phase-0-baseline-recovery.md` contract. Read root `AGENTS.md` and the slice's owning docs. Predecessor evidence: **[results]**. Approved decisions: **[ADR status]**. Stay within the listed files/responsibilities; preserve unrelated changes and Firebase configuration. Implement the slice's acceptance behavior with focused regression tests and its documentation updates. Run its available checks from `Code/`. Return changed files, rationale, actual test/manual results, and remaining risks; identify missing device/backend evidence honestly. Do not implement later phases, merge a PR, or change unapproved product/persistence decisions. The orchestrator will inspect and verify this slice before assigning the next.
+> Implement Phase 0 slice **[0A–0F]** from the approved `plans/phase-0-baseline-recovery.md` contract. Read root `AGENTS.md` and the slice's owning docs. Predecessor evidence: **[results]**. Approved decisions: **[ADR status]**. Stay within the listed files/responsibilities; preserve unrelated changes and Firebase configuration. Implement the slice's acceptance behavior with focused regression tests and its documentation updates. Run its available checks from `android/`. Return changed files, rationale, actual test/manual results, and remaining risks; identify missing device/backend evidence honestly. Do not implement later phases, merge a PR, or change unapproved product/persistence decisions. The orchestrator will inspect and verify this slice before assigning the next.

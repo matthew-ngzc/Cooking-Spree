@@ -14,7 +14,7 @@ The save format is manually keyed in `GameActivity.saveGameState()` and `loadGam
 
 ## Firebase / Google sign-in
 
-`AccountManager` uses Android Credential Manager to obtain a Google ID token, authenticates with Firebase Auth, and reads/writes Firestore. Configuration lives in `Code/app/google-services.json`; treat it as sensitive configuration and do not copy it into docs.
+`AccountManager` uses Android Credential Manager to obtain a Google ID token, authenticates with Firebase Auth, and reads/writes Firestore. Configuration lives in `android/app/google-services.json`; treat it as sensitive configuration and do not copy it into docs.
 
 Expected Firestore document: `chefs/{uid}` with `profile`, `stats`, and `settings` nested maps. The code also sketches social/following functionality, but it is not a complete feature.
 

@@ -21,7 +21,7 @@ Local unit tests run without an emulator. Device/instrumented tests and app smok
 
 ## Test commands
 
-Run Gradle from `Code/` in PowerShell. Run Git commands from the project root:
+Run Gradle from `android/` in PowerShell. Run Git commands from the project root. The accepted directory naming decision is recorded in [ADR 0005](decisions/0005-android-project-directory.md):
 
 ```powershell
 .\gradlew.bat assembleDebug
@@ -33,7 +33,7 @@ The last command needs a running emulator or connected device. The committed uni
 
 ## Current verified build state
 
-On 2026-09-21, `./gradlew.bat testDebugUnitTest --console=plain --no-daemon` reached Java compilation but failed before tests: `com.game.cookingspree.R` was missing generated nested resource classes such as `R.id`, `R.layout`, `R.string`, and `R.raw` (94 unresolved-resource errors). Resource symbols themselves appear in the generated `R.txt`, so this is a build/resource-generation integration problem, not evidence that every referenced resource is absent. Diagnose and restore `assembleDebug`/unit-test compilation before treating test results or manual gameplay validation as available.
+On 2026-10-03, `.\gradlew.bat testDebugUnitTest` completed successfully from `android/`, including resource processing, Java compilation, and the local unit-test task. The build emitted non-fatal warnings for the manifest's legacy `package` attribute, deprecated API use, and unchecked operations. The committed tests are still starter coverage, and no emulator/device validation was performed by this check.
 
 The device test's expected package name is also stale (`com.example.com.game.com.game.cookingspree` rather than the configured `com.game.cookingspree`); correct it when making the test suite meaningful.
 
@@ -48,9 +48,9 @@ The device test's expected package name is also stale (`com.example.com.game.com
 
 ## Where to put work
 
-- Java source: `Code/app/src/main/java/com/game/cookingspree/`.
-- Unit tests: `Code/app/src/test/`; device tests: `Code/app/src/androidTest/`.
-- Android layouts/resources: `Code/app/src/main/res/`.
-- Runtime tile/map assets: `Code/app/src/main/assets/`; update the Tiled authoring source deliberately too.
+- Java source: `android/app/src/main/java/com/game/cookingspree/`.
+- Unit tests: `android/app/src/test/`; device tests: `android/app/src/androidTest/`.
+- Android layouts/resources: `android/app/src/main/res/`.
+- Runtime tile/map assets: `android/app/src/main/assets/`; update the Tiled authoring source deliberately too.
 
 Do not place generated APKs, build directories, extracted dependencies, or device data under source folders.
