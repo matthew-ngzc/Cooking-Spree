@@ -8,16 +8,28 @@ Status: accepted phase outcome; specific improvements and detailed execution pla
 
 A polished, reliable, enjoyable offline-first casual cooking game, building on the recovered baseline and the optional competition feature.
 
+## Phase progress
+
+- [ ] Preceding-phase evidence and remaining limitations reviewed.
+- [ ] Quality outcomes selected and detailed plan approved by the owner.
+- [ ] Selected tutorial improvements delivered and verified.
+- [ ] Selected save continuity and compatibility improvements delivered and verified.
+- [ ] Selected map/device, rendering, and difficulty improvements delivered and verified.
+- [ ] Documentation updated and PR evidence attached.
+- [ ] Owner approves the Phase 2 PR.
+
+These checkboxes track progress but do not authorize implementation while this file remains an outline.
+
 ## What this phase should handle
 
 Select and detail improvements to tutorial usability, save continuity/compatibility, map/device support, and difficulty. Review-derived candidates include:
 
-- An action-gated tutorial that teaches through verified player actions.
-- Saving basket selection, ingredient-fetch progress, and scoring streak continuity where approved.
-- A versioned save boundary with stable map/recipe identities and an explicit legacy migration/recovery policy.
-- Less fragile recipe catalogue ownership and compatibility when authored content changes.
-- Map/layout behavior across selected device dimensions and evidence-backed rendering improvements.
-- Difficulty/balance refinements chosen by the owner, with gameplay verification.
+- [ ] An action-gated tutorial that teaches through verified player actions.
+- [ ] Saving basket selection, ingredient-fetch progress, and scoring streak continuity where approved.
+- [ ] A versioned save boundary with stable map/recipe identities and an explicit legacy migration/recovery policy.
+- [ ] Less fragile recipe catalogue ownership and compatibility when authored content changes.
+- [ ] Map/layout behavior across selected device dimensions and evidence-backed rendering improvements.
+- [ ] Difficulty/balance refinements chosen by the owner, with gameplay verification.
 
 These are candidates, not a commitment to implement every proposed design in the review.
 

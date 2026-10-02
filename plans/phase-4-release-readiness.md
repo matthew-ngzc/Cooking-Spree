@@ -8,12 +8,24 @@ Status: accepted phase outcome; release criteria and detailed execution plan awa
 
 A cohesive, appropriately licensed Android game that meets selected publishing requirements and the owner's explicit definition of Android completion.
 
+## Phase progress
+
+- [ ] Preceding-phase evidence and final feature set reviewed.
+- [ ] Distribution target, completion definition, and detailed release plan approved by the owner.
+- [ ] Visual/audio licensing, attribution, and credits verified.
+- [ ] Privacy, backup, device-transfer, and publishing requirements verified.
+- [ ] Release build and manual device evidence recorded.
+- [ ] Documentation updated and PR evidence attached.
+- [ ] Owner approves the Phase 4 PR and any publishing action.
+
+These checkboxes track progress but do not authorize implementation or publishing while this file remains an outline.
+
 ## What this phase should handle
 
-- Cohesive original/licensed visual assets and audio, attribution, and credits.
-- Selected distribution/publishing requirements and release verification.
-- Remaining privacy/backup/device-transfer decisions, including connecting an approved policy to the manifest and testing it.
-- An owner-approved Android completion checklist and release approval.
+- [ ] Cohesive original/licensed visual assets and audio, attribution, and credits.
+- [ ] Selected distribution/publishing requirements and release verification.
+- [ ] Remaining privacy/backup/device-transfer decisions, including connecting an approved policy to the manifest and testing it.
+- [ ] An owner-approved Android completion checklist and release approval.
 
 Use the [asset workflow](../docs/assets.md): agents prepare briefs/prompts; the owner generates/provides Gemini assets; agents integrate and verify them. Final requirements must be researched when this phase is planned rather than assumed from today's outline.
 

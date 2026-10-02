@@ -10,6 +10,8 @@
 
 For implementation work, Terra and Sol are orchestrators: make a detailed, reviewable plan before coding. When the user has asked to be grilled or a plan already resulted from that discussion, use that agreed plan as the implementation contract. Hand the bounded implementation task, acceptance criteria, and affected files to a Luna agent. The orchestrator reviews the result, integrates it, runs the relevant checks, and reports evidence.
 
+All maintained execution plans use GitHub-flavoured Markdown task checkboxes (`- [ ]` / `- [x]`) for actionable work, verification, gates, and owner approvals so progress can be updated in place. Add checkboxes when creating or refining a plan and update them as work is completed. Check an item only after its acceptance evidence exists; include or link that evidence near the item when practical. Checkboxes record progress but do not authorize unapproved work or promote inbox ideas. Only the product owner may check an owner-approval item.
+
 For a small direct fix where delegation would cost more than it saves, state that judgment and proceed. Do not delegate a task whose safety or product decision still needs the user's answer.
 
 ## Product and platform direction

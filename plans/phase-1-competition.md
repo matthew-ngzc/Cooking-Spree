@@ -8,13 +8,26 @@ Status: accepted phase outcome; detailed execution plan pending Phase 0 implemen
 
 Optional online competition enhances the game while guest/offline single-player remains fully usable. Deliver cloud profiles first, a global all-time leaderboard next, then Chef-Code friends ranking.
 
+## Phase progress
+
+- [ ] Phase 0 completion evidence reviewed.
+- [ ] Detailed Phase 1 plan and required ADRs approved by the owner.
+- [ ] Cloud profile and explicit local/cloud conflict choice delivered and verified.
+- [ ] Global all-time leaderboard delivered and verified.
+- [ ] Chef-Code friends and friends-only ranking delivered and verified.
+- [ ] Offline/guest and network-failure acceptance evidence recorded.
+- [ ] Documentation updated and PR evidence attached.
+- [ ] Owner approves the Phase 1 PR.
+
+These checkboxes track progress but do not authorize implementation while this file remains an outline.
+
 ## What this phase should handle
 
-- Google account identity and a Cloud Profile containing profile details, settings, lifetime statistics, and high score. Active games remain device-local.
-- Explicit local/cloud conflict handling: show the relevant facts for each complete profile and let the player choose **Use this device** or **Use cloud**. No silent merge or overwrite.
-- Authenticated Google-account score submission and global all-time ranking, followed by adding friends through Chef Codes and friends-only ranking.
-- Cloud/backend correctness and failure behavior, including numeric settings hydration, nested profile query/UID paths, Chef Code uniqueness, and cloud reads echoing writes.
-- Firestore rules and backend schema validation before treating the online feature as ready.
+- [ ] Google account identity and a Cloud Profile containing profile details, settings, lifetime statistics, and high score. Active games remain device-local.
+- [ ] Explicit local/cloud conflict handling: show the relevant facts for each complete profile and let the player choose **Use this device** or **Use cloud**. No silent merge or overwrite.
+- [ ] Authenticated Google-account score submission and global all-time ranking, followed by adding friends through Chef Codes and friends-only ranking.
+- [ ] Cloud/backend correctness and failure behavior, including numeric settings hydration, nested profile query/UID paths, Chef Code uniqueness, and cloud reads echoing writes.
+- [ ] Firestore rules and backend schema validation before treating the online feature as ready.
 
 ## Dependencies and planning gate
 

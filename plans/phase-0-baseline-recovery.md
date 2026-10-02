@@ -8,6 +8,18 @@
 
 **Status:** draft for approval. The owner requested a detailed plan to be executed by Luna; this document does not claim that the owner has accepted its proposed pause/save policies or that implementation has begun.
 
+## Phase progress
+
+- [ ] Owner approves this Phase 0 implementation contract.
+- [ ] Owner accepts ADR 0003 before slices 0D and 0E.
+- [ ] 0A — Verify and stabilise the build.
+- [ ] 0B — Signed-out and unavailable-cloud safety.
+- [ ] 0C — Single session, cancellation, and render/input teardown.
+- [ ] 0D — Consistent pause and tutorial lifecycle.
+- [ ] 0E — Non-destructive saves and validated legacy loading.
+- [ ] 0F — Integration evidence and delivery.
+- [ ] Owner approves the Phase 0 PR.
+
 Inputs:
 
 - [Corrected repository review](../docs/reports/2026-09-21-repository-review.md), checked against source on 2026-10-01.
@@ -40,12 +52,12 @@ The project root is the Git repository and `android/` is the Android Gradle proj
 
 Environment setup is part of execution, not an assumed owner prerequisite. The agent performs the following preflight before relying on test results and prepares device access early enough for lifecycle tests in 0C onward:
 
-1. Locate the actual Android SDK and supported JDK; verify Java/Gradle compatibility, SDK platform 35 for compilation, platform-tools/ADB, and emulator tooling. Use installed paths explicitly when tools are absent from PATH. Inspect existing SDK, AVD, and device configuration before installing or changing anything.
-2. Check attached devices with `adb devices -l` and list available virtual devices using the installed emulator-management tool. Inspect the owner's AVD location explicitly if the execution environment uses a different Windows user/profile; an empty list under a sandbox profile does not prove no owner AVD exists.
-3. Reuse a suitable development AVD/device. If none exists, create a dedicated Cooking Spree test AVD using an API 35 system image compatible with the host; API 34+ is the app's runtime requirement. Install only missing development packages needed for this setup. No Google-account login is required for Phase 0 guest/offline tests. Do not wipe an existing personal device or unrelated AVD.
-4. Start the AVD through command-line tooling, or use an owner-started device. Android Studio does not need to remain open. Wait for ADB to report the selected device ready and confirm Android has completed booting. Record its serial, API level, image, and relevant display configuration; select one explicit target if several devices are connected.
-5. After build recovery, run `gradlew.bat assembleDebug` and `gradlew.bat testDebugUnitTest` from `android/`. With the selected device ready, run `gradlew.bat connectedDebugAndroidTest`; build/run the app for the acceptance scenarios. Capture test reports, relevant redacted logs, labelled screenshots of materially changed scenes and key acceptance states, and short recordings or screenshot sequences where interaction/lifecycle behavior cannot be demonstrated by a still image. Capture additional screenshots for device/visual failures. Establish controlled guest/offline state on the dedicated test device without resetting the owner's data.
-6. Record the reproducible launch/test commands and any required setup in `docs/development.md` and repository documentation. Local unit tests do not need a running emulator. Automated device scenarios must assert outcomes, not merely launch the app; use a small test harness for canvas game state alongside tests through real Android controls.
+1. [ ] Locate the actual Android SDK and supported JDK; verify Java/Gradle compatibility, SDK platform 35 for compilation, platform-tools/ADB, and emulator tooling. Use installed paths explicitly when tools are absent from PATH. Inspect existing SDK, AVD, and device configuration before installing or changing anything.
+2. [ ] Check attached devices with `adb devices -l` and list available virtual devices using the installed emulator-management tool. Inspect the owner's AVD location explicitly if the execution environment uses a different Windows user/profile; an empty list under a sandbox profile does not prove no owner AVD exists.
+3. [ ] Reuse a suitable development AVD/device. If none exists, create a dedicated Cooking Spree test AVD using an API 35 system image compatible with the host; API 34+ is the app's runtime requirement. Install only missing development packages needed for this setup. No Google-account login is required for Phase 0 guest/offline tests. Do not wipe an existing personal device or unrelated AVD.
+4. [ ] Start the AVD through command-line tooling, or use an owner-started device. Android Studio does not need to remain open. Wait for ADB to report the selected device ready and confirm Android has completed booting. Record its serial, API level, image, and relevant display configuration; select one explicit target if several devices are connected.
+5. [ ] After build recovery, run `gradlew.bat assembleDebug` and `gradlew.bat testDebugUnitTest` from `android/`. With the selected device ready, run `gradlew.bat connectedDebugAndroidTest`; build/run the app for the acceptance scenarios. Capture test reports, relevant redacted logs, labelled screenshots of materially changed scenes and key acceptance states, and short recordings or screenshot sequences where interaction/lifecycle behavior cannot be demonstrated by a still image. Capture additional screenshots for device/visual failures. Establish controlled guest/offline state on the dedicated test device without resetting the owner's data.
+6. [ ] Record the reproducible launch/test commands and any required setup in `docs/development.md` and repository documentation. Local unit tests do not need a running emulator. Automated device scenarios must assert outcomes, not merely launch the app; use a small test harness for canvas game state alongside tests through real Android controls.
 
 The previous inspection found installed SDK/ADB/emulator executables, no attached device, and no AVD listed in the inspected environment; recheck at execution. If SDK downloads, license acceptance, hardware virtualization, Windows features, or device authorization actually require owner action, report the specific missing prerequisite and steps. Continue independent build/unit-test work while device setup is blocked. Do not mark device verification passed until it ran.
 
@@ -57,12 +69,12 @@ Setup references: [Android virtual device management](https://developer.android.
 
 Tasks:
 
-1. Run `assembleDebug` and `testDebugUnitTest` from tracked inputs. The unit-test task succeeded on 2026-10-03; verify that result is repeatable. If the historical 94-error resource-symbol failure returns, inspect namespace, resource inputs, generated symbols/classes, and compiler classpath before selecting a fix; do not assume every referenced resource is absent.
-2. Fix only a demonstrated configuration/input failure. Do not hand-write `R.java`, remove Firebase configuration, rename the application ID, blanket-disable checks, or upgrade dependencies/platform levels without demonstrated necessity.
-3. Correct the stale instrumented application-package assertion. Keep the current Android/API boundary.
-4. Run `gradlew.bat assembleDebug` and `gradlew.bat testDebugUnitTest` from `android/`. Confirm a subsequent build succeeds without manually editing generated outputs. A targeted clean reproduction is appropriate if stale artifacts are part of the cause.
+1. [ ] Run `assembleDebug` and `testDebugUnitTest` from tracked inputs. The unit-test task succeeded on 2026-10-03; verify that result is repeatable. If the historical 94-error resource-symbol failure returns, inspect namespace, resource inputs, generated symbols/classes, and compiler classpath before selecting a fix; do not assume every referenced resource is absent.
+2. [ ] Fix only a demonstrated configuration/input failure. Do not hand-write `R.java`, remove Firebase configuration, rename the application ID, blanket-disable checks, or upgrade dependencies/platform levels without demonstrated necessity.
+3. [ ] Correct the stale instrumented application-package assertion. Keep the current Android/API boundary.
+4. [ ] Run `gradlew.bat assembleDebug` and `gradlew.bat testDebugUnitTest` from `android/`. Confirm a subsequent build succeeds without manually editing generated outputs. A targeted clean reproduction is appropriate if stale artifacts are part of the cause.
 
-**Gate:** both commands succeed repeatedly from tracked/configured inputs; any reproduced failure's root cause and fix are documented. Starter unit-test success is only a build gate, not gameplay evidence. If credentials or unavailable dependencies block recovery, identify the exact dependency and continue unaffected investigation.
+- [ ] **0A gate:** both commands succeed repeatedly from tracked/configured inputs; any reproduced failure's root cause and fix are documented. Starter unit-test success is only a build gate, not gameplay evidence. If credentials or unavailable dependencies block recovery, identify the exact dependency and continue unaffected investigation.
 
 ## 0B — signed-out and unavailable-cloud safety
 
@@ -70,15 +82,15 @@ Tasks:
 
 Tasks:
 
-1. Make local preference/stat writes succeed independently of authentication and Firestore tasks. Obtain the current user once per update; skip cloud writes when absent and attach bounded, non-sensitive failure reporting when present. Avoid synchronously waiting for network operations.
-2. Make the initial joystick selection reflect the saved setting without treating programmatic hydration as a user edit. Verify both menu and game launch.
-3. Remove the static reference chain from `PrefsHelper` to an Activity. Use application-context storage and an Activity-free sync boundary, keeping credential prompts/dialogs activity-owned. Avoid replacing the leak with a static callback that captures the Activity.
-4. Contain Firebase initialization/task failures so guest gameplay/settings remain available. Inspect initialization separately from network failure; do not swallow arbitrary gameplay exceptions as an offline workaround.
-5. Remove preference dumps and all identified raw chef-name logging. Preserve useful redacted diagnostics.
+1. [ ] Make local preference/stat writes succeed independently of authentication and Firestore tasks. Obtain the current user once per update; skip cloud writes when absent and attach bounded, non-sensitive failure reporting when present. Avoid synchronously waiting for network operations.
+2. [ ] Make the initial joystick selection reflect the saved setting without treating programmatic hydration as a user edit. Verify both menu and game launch.
+3. [ ] Remove the static reference chain from `PrefsHelper` to an Activity. Use application-context storage and an Activity-free sync boundary, keeping credential prompts/dialogs activity-owned. Avoid replacing the leak with a static callback that captures the Activity.
+4. [ ] Contain Firebase initialization/task failures so guest gameplay/settings remain available. Inspect initialization separately from network failure; do not swallow arbitrary gameplay exceptions as an offline workaround.
+5. [ ] Remove preference dumps and all identified raw chef-name logging. Preserve useful redacted diagnostics.
 
-**Gate:** with no signed-in user and no network, fresh launch, joystick/volume changes, a complete game-over sequence, high score, average score, and games-played updates succeed locally. Restarting the app preserves local data. A simulated sync failure cannot abort those writes. No static owner retains a destroyed Activity, and raw profile values are absent from these log paths.
+- [ ] **0B gate:** with no signed-in user and no network, fresh launch, joystick/volume changes, a complete game-over sequence, high score, average score, and games-played updates succeed locally. Restarting the app preserves local data. A simulated sync failure cannot abort those writes. No static owner retains a destroyed Activity, and raw profile values are absent from these log paths.
 
-**Tests:** null-user update, failed-sync/local-write independence, initial selection without upload, and game-over stats/save clearing. Use a small fake sync seam for deterministic tests; do not require a live Firebase account/backend for Phase 0 gates.
+- [ ] **0B tests:** null-user update, failed-sync/local-write independence, initial selection without upload, and game-over stats/save clearing. Use a small fake sync seam for deterministic tests; do not require a live Firebase account/backend for Phase 0 gates.
 
 ## 0C — single session, cancellation, and render/input teardown
 
@@ -86,15 +98,15 @@ Tasks:
 
 Tasks:
 
-1. Select the normal/tutorial layout before composing components. Initialize exactly one manager, render binding, pot pool, and fetch/fill chain per active activity session; prevent tutorial superclass setup from creating a hidden first game.
-2. Expose idempotent close/cancel operations. Reject work after closure, stop handlers, interrupt sleeping/queue-waiting work, and exit interrupted tasks before food creation, basket mutation, or callbacks. Dispose the filler through its owning fetcher.
-3. Replace the pot-to-`GameActivity` cast with a narrow listener. Suppress queued UI callbacks after session closure as well as worker callbacks; a main-thread runnable already posted needs the same ownership check.
-4. Give the render loop safely published state, null/init protection, prompt interrupt exit, and bounded teardown. Prevent a new surface from launching a second loop while the old one remains active; do not hold game-state locks while joining workers.
-5. Cancel all held-direction callbacks on pause/stop/destruction and handle simultaneous direction touches without orphaning a self-reposting runnable. Reset held movement at the same boundary.
+1. [ ] Select the normal/tutorial layout before composing components. Initialize exactly one manager, render binding, pot pool, and fetch/fill chain per active activity session; prevent tutorial superclass setup from creating a hidden first game.
+2. [ ] Expose idempotent close/cancel operations. Reject work after closure, stop handlers, interrupt sleeping/queue-waiting work, and exit interrupted tasks before food creation, basket mutation, or callbacks. Dispose the filler through its owning fetcher.
+3. [ ] Replace the pot-to-`GameActivity` cast with a narrow listener. Suppress queued UI callbacks after session closure as well as worker callbacks; a main-thread runnable already posted needs the same ownership check.
+4. [ ] Give the render loop safely published state, null/init protection, prompt interrupt exit, and bounded teardown. Prevent a new surface from launching a second loop while the old one remains active; do not hold game-state locks while joining workers.
+5. [ ] Cancel all held-direction callbacks on pause/stop/destruction and handle simultaneous direction touches without orphaning a self-reposting runnable. Reset held movement at the same boundary.
 
-**Gate:** repeated game/tutorial entry/exit leaves one active session and no old spawning/ticking/fetching/cooking work. Closing during cooking, fetching, or a blocked queue produces no late session mutation or UI callback. Surface recreation leaves one render loop; teardown has a defined bound and does not hang the UI.
+- [ ] **0C gate:** repeated game/tutorial entry/exit leaves one active session and no old spawning/ticking/fetching/cooking work. Closing during cooking, fetching, or a blocked queue produces no late session mutation or UI callback. Surface recreation leaves one render loop; teardown has a defined bound and does not hang the UI.
 
-**Tests:** idempotent closure, interrupted cook without food/callback, interrupted consumer without continuation, closed-owner callback suppression, two-direction press/release, and tutorial initialization count. Device lifecycle checks verify destruction/recreation; garbage collection timing alone is not proof of cleanup.
+- [ ] **0C tests:** idempotent closure, interrupted cook without food/callback, interrupted consumer without continuation, closed-owner callback suppression, two-direction press/release, and tutorial initialization count. Device lifecycle checks verify destruction/recreation; garbage collection timing alone is not proof of cleanup.
 
 ## 0D — consistent pause and tutorial lifecycle
 
@@ -102,15 +114,15 @@ Tasks:
 
 Tasks:
 
-1. Track manual-menu pause, background pause, tutorial pause, and terminal/closed state independently. Gameplay runs only when no pause reason applies. Returning to the foreground removes only the background reason; it cannot resume a manual menu or tutorial pause.
-2. Freeze order countdown/spawning, player progression/input, cooking, and ingredient fetch/fill transitions at pause. Preserve remaining in-memory work rather than completing it immediately or restarting it on resume. Rendering may continue to show the paused scene. Make boundary transitions safe when a worker tick and pause arrive together.
-3. Keep UI/menu visibility consistent with pause state. Prevent ordinary gameplay interaction while paused or over. Preserve the existing tutorial's intended movement demonstration through an explicit allowed step; do not redesign the tutorial.
-4. Initialize tutorial steps before checking their count, hide the ordinary pause button during the walkthrough, and prevent inherited `onResume` from undoing tutorial pause. Restore normal controls after skip/completion.
-5. Make game over terminal and idempotent: one dialog, one local stat update, one save clear; remaining callbacks and multiple expiries in one update cannot finalize the game repeatedly.
+1. [ ] Track manual-menu pause, background pause, tutorial pause, and terminal/closed state independently. Gameplay runs only when no pause reason applies. Returning to the foreground removes only the background reason; it cannot resume a manual menu or tutorial pause.
+2. [ ] Freeze order countdown/spawning, player progression/input, cooking, and ingredient fetch/fill transitions at pause. Preserve remaining in-memory work rather than completing it immediately or restarting it on resume. Rendering may continue to show the paused scene. Make boundary transitions safe when a worker tick and pause arrive together.
+3. [ ] Keep UI/menu visibility consistent with pause state. Prevent ordinary gameplay interaction while paused or over. Preserve the existing tutorial's intended movement demonstration through an explicit allowed step; do not redesign the tutorial.
+4. [ ] Initialize tutorial steps before checking their count, hide the ordinary pause button during the walkthrough, and prevent inherited `onResume` from undoing tutorial pause. Restore normal controls after skip/completion.
+5. [ ] Make game over terminal and idempotent: one dialog, one local stat update, one save clear; remaining callbacks and multiple expiries in one update cannot finalize the game repeatedly.
 
-**Gate:** pause for at least 10 seconds while cooking and swapping; order/cook/fetch/player state is unchanged after pause settles. Resume continues once with remaining time. Backgrounding while manually paused returns to a visible paused menu. Backgrounding a running game resumes safely. Tutorial starts paused and creates no hidden orders; skip/completion produces one playable session.
+- [ ] **0D gate:** pause for at least 10 seconds while cooking and swapping; order/cook/fetch/player state is unchanged after pause settles. Resume continues once with remaining time. Backgrounding while manually paused returns to a visible paused menu. Backgrounding a running game resumes safely. Tutorial starts paused and creates no hidden orders; skip/completion produces one playable session.
 
-**Tests:** combined pause reasons, remaining duration across pause, resume idempotence, tutorial first resume, multiple expiries/finalization once. Control time with a fake clock where practical; avoid sleep-heavy unit tests.
+- [ ] **0D tests:** combined pause reasons, remaining duration across pause, resume idempotence, tutorial first resume, multiple expiries/finalization once. Control time with a fake clock where practical; avoid sleep-heavy unit tests.
 
 ## 0E — non-destructive saves and validated legacy loading
 
@@ -118,47 +130,45 @@ Tasks:
 
 Tasks:
 
-1. Snapshot completed food without consuming it. Initialize cooking recipe/progress before publishing COOKING; loaded cooking must restore both before workers resume. Snapshot each pot consistently rather than separately observing state, ingredients, recipe, and food.
-2. Save only through the paused boundary, serialize a validated complete snapshot, and write existing keys in one editor operation. A failed capture/write keeps the previous save and current game intact; display a single success or failure result, not the current unconditional extra success toast.
-3. Capture a stable logical movement tile rather than a transient interpolated coordinate. Keep live paused state unchanged. Validate legacy coordinates; normalize a fractional legacy location only to a valid nearby traversable tile, otherwise reject safely. Explain this compatibility behavior in persistence documentation.
-4. Parse all legacy values into a candidate state before mutating live gameplay. Bound counts against catalogue/current map/capacities; validate field types, positions/collision, nonnegative score, failures below game-over threshold, ingredient IDs, known recipe names (including Waste where legitimate), pot state/content/progress consistency, and order times. A finished/dead save must not invoke game-over during partial restoration.
-5. Apply a validated candidate before starting its orders/cooking workers, with the fresh game's timers/refill tasks unable to race restoration. Reject an invalid candidate without a partially loaded session; preserve stored data, show a recovery message, and offer a new game. Do not silently turn unknown recipes into Waste or drop saved orders.
-6. Retain current key names, map list ordering, and valid legacy saves. Test legacy Waste pots and partially filled EMPTY pots explicitly. Schema versioning, stable object/recipe IDs, basket/fetch/streak continuity, and automatic destructive migration are deferred.
+1. [ ] Snapshot completed food without consuming it. Initialize cooking recipe/progress before publishing COOKING; loaded cooking must restore both before workers resume. Snapshot each pot consistently rather than separately observing state, ingredients, recipe, and food.
+2. [ ] Save only through the paused boundary, serialize a validated complete snapshot, and write existing keys in one editor operation. A failed capture/write keeps the previous save and current game intact; display a single success or failure result, not the current unconditional extra success toast.
+3. [ ] Capture a stable logical movement tile rather than a transient interpolated coordinate. Keep live paused state unchanged. Validate legacy coordinates; normalize a fractional legacy location only to a valid nearby traversable tile, otherwise reject safely. Explain this compatibility behavior in persistence documentation.
+4. [ ] Parse all legacy values into a candidate state before mutating live gameplay. Bound counts against catalogue/current map/capacities; validate field types, positions/collision, nonnegative score, failures below game-over threshold, ingredient IDs, known recipe names (including Waste where legitimate), pot state/content/progress consistency, and order times. A finished/dead save must not invoke game-over during partial restoration.
+5. [ ] Apply a validated candidate before starting its orders/cooking workers, with the fresh game's timers/refill tasks unable to race restoration. Reject an invalid candidate without a partially loaded session; preserve stored data, show a recovery message, and offer a new game. Do not silently turn unknown recipes into Waste or drop saved orders.
+6. [ ] Retain current key names, map list ordering, and valid legacy saves. Test legacy Waste pots and partially filled EMPTY pots explicitly. Schema versioning, stable object/recipe IDs, basket/fetch/streak continuity, and automatic destructive migration are deferred.
 
-**Gate:** saving twice with DONE food leaves it collectible exactly once. Load a COOKING save, save again before completion, then reload and collect once. EMPTY pots with one/two ingredients, held items, table items, orders, score, and failures survive a valid round trip. Failed saves retain the last valid save. Malformed, unknown-recipe, out-of-range, and completed-game saves never partially restore or award stats. Ending a loaded game clears its save and subsequent Load reports no save.
+- [ ] **0E gate:** saving twice with DONE food leaves it collectible exactly once. Load a COOKING save, save again before completion, then reload and collect once. EMPTY pots with one/two ingredients, held items, table items, orders, score, and failures survive a valid round trip. Failed saves retain the last valid save. Malformed, unknown-recipe, out-of-range, and completed-game saves never partially restore or award stats. Ending a loaded game clears its save and subsequent Load reports no save.
 
-**Tests:** DTO/legacy-parser validation with wrong types/counts/IDs/states/times/coordinates, non-consuming snapshots, resumed-recipe snapshot, repeated save/load, recovery without mutation, and game-over save clearing. Test map-count mismatch rejection; reordered maps with identical counts remain a documented limitation until stable IDs are introduced.
+- [ ] **0E tests:** DTO/legacy-parser validation with wrong types/counts/IDs/states/times/coordinates, non-consuming snapshots, resumed-recipe snapshot, repeated save/load, recovery without mutation, and game-over save clearing. Test map-count mismatch rejection; reordered maps with identical counts remain a documented limitation until stable IDs are introduced.
 
 ## 0F — integration evidence and delivery
 
 **Dependencies:** 0A–0E. **Files:** meaningful tests under `android/app/src/test/` and `android/app/src/androidTest/`; documentation and PR template only unless verification exposes an in-scope defect.
 
-1. Replace the arithmetic starter with regression coverage for exact recipe matching (duplicate potatoes included), wrong/extra ingredients, order expiry, completion points/streak reset, and three-failure finalization. Add deterministic clock/sync seams only where needed; retain the current documented balance. Correct resource/package smoke checks where useful.
-2. Run `gradlew.bat assembleDebug` and `gradlew.bat testDebugUnitTest`. With an attached API 34+ emulator/device, run `gradlew.bat connectedDebugAndroidTest`. Record command, result, date, device/API for device checks, and the behavior each test protects. A skipped check is not a pass.
-3. Complete the smoke matrix below offline/signed out. Repeat lifecycle entry/exit and surface recreation checks at least five times. Test game-over save/stat behavior both from a new session and from a loaded one.
-4. Update the owning documentation with actual final behavior, commands, limitations, and accepted decisions. Mark individual report findings resolved only with a source/test reference and date; keep deferred findings visible. Do not rewrite the report as if the original findings never existed.
-5. Review all Luna changes against this contract, confirm no accidental configuration/asset exposure, and prepare a PR using `.github/pull_request_template.md`. Include changelog, reason, material trade-offs, relevant decisions, deferred risks, command/test results, and device evidence. Attach labelled screenshots for every materially changed scene, using before/after views when useful; attach a short recording or concise screenshot sequence for interaction or lifecycle behavior that a still image cannot prove. Record the device/emulator and API level, note any unverified scenario, and redact sensitive data. Commit messages follow Conventional Commits. The owner approves the PR; do not merge automatically.
+1. [ ] Replace the arithmetic starter with regression coverage for exact recipe matching (duplicate potatoes included), wrong/extra ingredients, order expiry, completion points/streak reset, and three-failure finalization. Add deterministic clock/sync seams only where needed; retain the current documented balance. Correct resource/package smoke checks where useful.
+2. [ ] Run `gradlew.bat assembleDebug` and `gradlew.bat testDebugUnitTest`. With an attached API 34+ emulator/device, run `gradlew.bat connectedDebugAndroidTest`. Record command, result, date, device/API for device checks, and the behavior each test protects. A skipped check is not a pass.
+3. [ ] Complete the smoke matrix below offline/signed out. Repeat lifecycle entry/exit and surface recreation checks at least five times. Test game-over save/stat behavior both from a new session and from a loaded one.
+4. [ ] Update the owning documentation with actual final behavior, commands, limitations, and accepted decisions. Mark individual report findings resolved only with a source/test reference and date; keep deferred findings visible. Do not rewrite the report as if the original findings never existed.
+5. [ ] Review all Luna changes against this contract, confirm no accidental configuration/asset exposure, and prepare a PR using `.github/pull_request_template.md`. Include changelog, reason, material trade-offs, relevant decisions, deferred risks, command/test results, and device evidence. Attach labelled screenshots for every materially changed scene, using before/after views when useful; attach a short recording or concise screenshot sequence for interaction or lifecycle behavior that a still image cannot prove. Record the device/emulator and API level, note any unverified scenario, and redact sensitive data. Commit messages follow Conventional Commits. The owner approves the PR; do not merge automatically.
 
-**Gate:** evidence supports every Phase 0 criterion and the owner approves the PR. Without device evidence, status is implementation complete/device verification pending, not Phase 0 complete.
+- [ ] **0F gate:** evidence supports every Phase 0 criterion and the owner approves the PR. Without device evidence, status is implementation complete/device verification pending, not Phase 0 complete.
 
-## Manual acceptance matrix
+## Manual acceptance checklist
 
-| Scenario | Expected result |
-| --- | --- |
-| Fresh launch signed out, airplane mode | Menu and game open; saved joystick/volume work; no crash or network gate. |
-| Valid dish, duplicate-ingredient recipe, invalid dish | Correct dish/Waste results; matching submission consumes once and awards the current rule's points. |
-| Basket, table, rubbish, collision | Existing interactions and tile movement work; no stuck swap blocker after a normal fetch. |
-| Three order failures | Exactly one game-over/stat update; high score remains local; no further order spawning. |
-| Pause during cook/fetch; wait 10 seconds | Gameplay work freezes after transition, resumes once, and preserves remaining progress. |
-| Pause menu → background → foreground | Pause/menu state persists; Resume is explicit. |
-| Running game → background → foreground | Background time does not expire orders or complete cooking/fetching. |
-| Two simultaneous direction touches; release; exit | Movement stops and no old input runnable continues. |
-| Save DONE pot twice; resume/collect | Saving does not remove food; collect yields exactly one item. |
-| Load COOKING pot → save again → reload | No null recipe/progress; cooking resumes and completes once. |
-| Load malformed or completed legacy save | Visible recovery, no partial state/stat award; existing stored data is not silently deleted. |
-| Complete a loaded game → Load again | Saved run is cleared; no replay from the completed save. |
-| Enter/skip/complete tutorial; repeat five times | One session, correct tutorial pause/controls, no hidden game-over callbacks. |
-| Destroy/recreate while workers run or wait | Workers/callbacks close safely, one new render loop, no UI teardown hang. |
+- [ ] **Fresh launch signed out, airplane mode:** menu and game open; saved joystick/volume work; no crash or network gate.
+- [ ] **Valid dish, duplicate-ingredient recipe, invalid dish:** correct dish/Waste results; matching submission consumes once and awards the current rule's points.
+- [ ] **Basket, table, rubbish, collision:** existing interactions and tile movement work; no stuck swap blocker after a normal fetch.
+- [ ] **Three order failures:** exactly one game-over/stat update; high score remains local; no further order spawning.
+- [ ] **Pause during cook/fetch; wait 10 seconds:** gameplay work freezes after transition, resumes once, and preserves remaining progress.
+- [ ] **Pause menu → background → foreground:** pause/menu state persists; Resume is explicit.
+- [ ] **Running game → background → foreground:** background time does not expire orders or complete cooking/fetching.
+- [ ] **Two simultaneous direction touches; release; exit:** movement stops and no old input runnable continues.
+- [ ] **Save DONE pot twice; resume/collect:** saving does not remove food; collect yields exactly one item.
+- [ ] **Load COOKING pot → save again → reload:** no null recipe/progress; cooking resumes and completes once.
+- [ ] **Load malformed or completed legacy save:** visible recovery, no partial state/stat award; existing stored data is not silently deleted.
+- [ ] **Complete a loaded game → Load again:** saved run is cleared; no replay from the completed save.
+- [ ] **Enter/skip/complete tutorial; repeat five times:** one session, correct tutorial pause/controls, no hidden game-over callbacks.
+- [ ] **Destroy/recreate while workers run or wait:** workers/callbacks close safely, one new render loop, no UI teardown hang.
 
 ## Dependencies and owner involvement
 

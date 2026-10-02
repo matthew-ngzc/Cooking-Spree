@@ -8,11 +8,23 @@ Status: accepted future outcome; product rules, technical design, and execution 
 
 A defined and tested in-person party cooking mode for people physically gathered together, with the social energy of a cooperative cooking game.
 
+## Phase progress
+
+- [ ] Preceding-phase evidence reviewed.
+- [ ] Multiplayer product rules and device/input/connectivity model approved by the owner.
+- [ ] Detailed plan and required ADRs approved by the owner.
+- [ ] Selected co-located multiplayer mode delivered and verified.
+- [ ] Offline single-player regression evidence recorded.
+- [ ] Documentation updated and PR evidence attached.
+- [ ] Owner approves the Phase 3 PR.
+
+These checkboxes track progress but do not authorize implementation while this file remains an outline.
+
 ## What this phase should handle
 
-- Owner decisions about player count, shared versus separate devices, input model, session setup, connectivity, and cooperative rules.
-- A concrete multiplayer design and its effect on gameplay ownership, synchronization, pause, and session recovery.
-- Implementation and verification of the selected party mode while preserving enjoyable offline single-player.
+- [ ] Owner decisions about player count, shared versus separate devices, input model, session setup, connectivity, and cooperative rules.
+- [ ] A concrete multiplayer design and its effect on gameplay ownership, synchronization, pause, and session recovery.
+- [ ] Implementation and verification of the selected party mode while preserving enjoyable offline single-player.
 
 Do not choose a transport, shared-device model, or cross-platform architecture prematurely. Multiplayer leaderboard details are not yet committed.
 

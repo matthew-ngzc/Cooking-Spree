@@ -1,5 +1,7 @@
 # COOKING SPREE future plans / direction
 
+> Historical brainstorming source. Its checkboxes preserve idea status only; they do not authorize implementation or promote an idea into the roadmap.
+
 # Matthew Prio
 
 - [ ]  Make game playable without google sign in
@@ -62,14 +64,14 @@
 - [ ] split single player and multiplayer leaderboard, multiplayer show a total score and the involved people
 
 
-1. Make game playable without google sign in
+1. [ ] Make game playable without google sign in
 
 Logic:
 - high score will only record locally if not signed in, if signed in it will update both local and firebase (simple try catch, or if statement)
 - if afterwards they want to sign in, we ask them if they want to sync current records with Google account, if not it will be overriden with whatever was saved on Google account (could be empty game), might want to show basic data like chefs name (similar to how coc does it)
 
 
-2.  Allow game to be playable without internet connection (social features like leaderboard, cloud save, friend list disabled without internet, enabled when there's internet)
+2. [ ] Allow game to be playable without internet connection (social features like leaderboard, cloud save, friend list disabled without internet, enabled when there's internet)
 Logic
 - the users device will be the source of truth
 - if offline, all records saved on device, once online and signed in before, auto syncs with firebase

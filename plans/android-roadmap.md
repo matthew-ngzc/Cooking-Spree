@@ -20,11 +20,19 @@ Execute in order. Each phase has its own Markdown file; this document owns the o
 | [3 — Co-located multiplayer](phase-3-co-located-multiplayer.md) | Define player/device/input/connectivity/rules, then implement and verify an in-person party mode while preserving single-player. | Accepted future outcome; product and technical design undecided. |
 | [4 — Release readiness](phase-4-release-readiness.md) | Cohesive licensed/original visuals/audio, credits, privacy/backup decisions, selected publishing requirements, release evidence, and an approved Android completion checklist. | Accepted outcome; release criteria await owner decisions. |
 
+### Roadmap completion checklist
+
+- [ ] Phase 0 — Baseline recovery complete, evidenced, and owner-approved.
+- [ ] Phase 1 — Competition complete, evidenced, and owner-approved.
+- [ ] Phase 2 — Single-player quality complete, evidenced, and owner-approved.
+- [ ] Phase 3 — Co-located multiplayer complete, evidenced, and owner-approved.
+- [ ] Phase 4 — Release readiness complete, evidenced, and owner-approved.
+
 ## Where all the ideas live
 
 - [Idea inbox](../docs/ideas/inbox.md): the preserved, append-only collection of app inspirations, grouped by accounts, competition, quality, multiplayer, customisation, and release. It includes ideas that are deferred or outside the current roadmap.
 - [Idea inbox guide](../docs/ideas/README.md): how ideas are captured and promoted into committed work.
-- [Original future-plans document](COOKING%20SPREE%20future%20plans.md): the original detailed brainstorming source, preserved intact.
+- [Original future-plans document](COOKING%20SPREE%20future%20plans.md): the original detailed brainstorming source. Preserve its ideas and wording; checkbox/status annotations may be maintained for progress clarity.
 
 An idea appearing in these documents is not automatically approved work. Only the owner promotes it into a phase by approving its outcome, priority, and acceptance criteria. Keep original wording; mark ideas linked, deferred, or superseded instead of deleting them.
 
@@ -32,7 +40,18 @@ An idea appearing in these documents is not automatically approved work. Only th
 
 Only the next phase should become task-level detailed. Phase 0 is detailed now; retain later phases as outlines until implementation evidence and owner decisions make their scope concrete. Detail Phase 1 at Phase 0 closeout, then Phase 2 when it becomes next. The phase files carry their review-derived issues and dependencies so that context is preserved without speculative task lists.
 
-Before a phase begins, its file must contain an approved outcome, scope/exclusions, bounded slices, dependencies, acceptance criteria, verification, documentation changes, and links to relevant ideas/ADRs. Material architecture, persistence, online, platform, or product decisions use [decision records](../docs/decisions/README.md). Revisions preserve earlier detail by marking it deferred or superseded rather than silently removing commitments.
+All maintained plans use task checkboxes for actionable work, verification, gates, and owner approvals. An unchecked box means pending, not approved. Mark a box complete only when its stated result is true and evidence is recorded or linked; owner-approval boxes may be checked only by the owner. Future-phase outcome checklists remain non-authorizing outlines until that phase receives an approved detailed plan.
+
+Before a phase begins, complete this planning checklist in its file:
+
+- [ ] Outcome approved by the owner.
+- [ ] Scope and exclusions defined.
+- [ ] Bounded slices and dependencies defined.
+- [ ] Acceptance criteria and verification defined.
+- [ ] Documentation owners identified.
+- [ ] Relevant ideas and ADRs linked; required material decisions recorded.
+
+Material architecture, persistence, online, platform, or product decisions use [decision records](../docs/decisions/README.md). Revisions preserve earlier detail by marking it deferred or superseded rather than silently removing commitments.
 
 Sol/Terra plans and orchestrates; Luna implements bounded slices; the orchestrator reviews, integrates, verifies, and reports evidence. Follow [agent governance](../docs/decisions/0001-agent-governance-and-delivery.md). Phase 0's detailed file includes the Luna handoff and slice gates.
 
