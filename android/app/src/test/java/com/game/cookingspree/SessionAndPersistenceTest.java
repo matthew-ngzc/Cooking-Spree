@@ -15,6 +15,123 @@ import static org.junit.Assert.*;
 
 public class SessionAndPersistenceTest {
     @Test
+    public void independentPauseReasonsRemainUntilEachReasonIsCleared() {
+        PauseState state = new PauseState();
+        state.setPaused(PauseState.Reason.MANUAL_MENU, true);
+        state.setPaused(PauseState.Reason.BACKGROUND, true);
+
+        state.setPaused(PauseState.Reason.BACKGROUND, false);
+        assertFalse(state.isRunning());
+        state.setPaused(PauseState.Reason.MANUAL_MENU, false);
+        assertTrue(state.isRunning());
+    }
+
+    @Test
+    public void activeDurationRetainsOnlyTheUnelapsedRemainder() {
+        ActiveDuration duration = new ActiveDuration(1200);
+        duration.consume(400_000_000L);
+        assertEquals(800_000_000L, duration.remainingNanos());
+        duration.consume(300_000_000L);
+        assertEquals(500_000_000L, duration.remainingNanos());
+        duration.consume(900_000_000L);
+        assertTrue(duration.isComplete());
+    }
+
+    @Test
+    public void duplicateResumeDoesNotClearAnotherPauseReason() {
+        PauseState state = new PauseState();
+        state.setPaused(PauseState.Reason.MANUAL_MENU, true);
+        state.setPaused(PauseState.Reason.BACKGROUND, true);
+        state.setPaused(PauseState.Reason.MANUAL_MENU, false);
+        state.setPaused(PauseState.Reason.MANUAL_MENU, false);
+        assertFalse(state.isRunning());
+        state.setPaused(PauseState.Reason.BACKGROUND, false);
+        assertTrue(state.isRunning());
+    }
+
+    @Test
+    public void tutorialFirstResumeOnlyRemovesBackgroundPause() {
+        PauseState state = new PauseState();
+        state.setPaused(PauseState.Reason.TUTORIAL, true);
+        state.setPaused(PauseState.Reason.BACKGROUND, true);
+        state.setPaused(PauseState.Reason.BACKGROUND, false);
+        assertFalse(state.isRunning());
+        state.setPaused(PauseState.Reason.TUTORIAL, false);
+        assertTrue(state.isRunning());
+    }
+
+    @Test
+    public void tutorialMovementAllowanceDoesNotRunGameplayAndBackgroundBlocksIt() {
+        PauseState state = new PauseState();
+        state.setPaused(PauseState.Reason.TUTORIAL, true);
+        state.allowTutorialMovement(true);
+
+        assertFalse(state.isRunning());
+        assertTrue(state.isMovementAllowed());
+        state.setPaused(PauseState.Reason.BACKGROUND, true);
+        assertFalse(state.isMovementAllowed());
+        state.setPaused(PauseState.Reason.BACKGROUND, false);
+        assertTrue(state.isMovementAllowed());
+        state.allowTutorialMovement(false);
+        assertFalse(state.isMovementAllowed());
+        assertFalse(state.isRunning());
+    }
+
+    @Test
+    public void pauseTransitionWaitsForSerializedGameplayCallback() throws Exception {
+        PauseState state = new PauseState();
+        CountDownLatch callbackEntered = new CountDownLatch(1);
+        CountDownLatch releaseCallback = new CountDownLatch(1);
+        CountDownLatch pauseAttempted = new CountDownLatch(1);
+        CountDownLatch pauseCompleted = new CountDownLatch(1);
+        AtomicBoolean callbackDelivered = new AtomicBoolean();
+        Thread callbackThread = new Thread(() -> state.runIfRunning(() -> {
+            callbackDelivered.set(true);
+            callbackEntered.countDown();
+            try { releaseCallback.await(); }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }));
+        Thread pauseThread = new Thread(() -> {
+            pauseAttempted.countDown();
+            state.setPaused(PauseState.Reason.BACKGROUND, true);
+            pauseCompleted.countDown();
+        });
+
+        callbackThread.start();
+        assertTrue(callbackEntered.await(1, TimeUnit.SECONDS));
+        pauseThread.start();
+        assertTrue(pauseAttempted.await(1, TimeUnit.SECONDS));
+        releaseCallback.countDown();
+        assertTrue(pauseCompleted.await(1, TimeUnit.SECONDS));
+        callbackThread.join(1000);
+        pauseThread.join(1000);
+
+        assertTrue(callbackDelivered.get());
+        assertFalse(state.isRunning());
+    }
+
+    @Test
+    public void repeatedTerminalCallbacksFinalizeStatsAndSaveOnce() {
+        FinalizationGate gate = new FinalizationGate();
+        AtomicInteger statWrites = new AtomicInteger();
+        AtomicInteger saveClears = new AtomicInteger();
+        AtomicInteger dialogs = new AtomicInteger();
+        Runnable finalization = () -> {
+            statWrites.incrementAndGet();
+            saveClears.incrementAndGet();
+            dialogs.incrementAndGet();
+        };
+
+        gate.runOnce(finalization);
+        gate.runOnce(finalization);
+        gate.runOnce(finalization);
+
+        assertEquals(1, statWrites.get());
+        assertEquals(1, saveClears.get());
+        assertEquals(1, dialogs.get());
+    }
+
+    @Test
     public void sessionClosureIsIdempotentAndSuppressesAlreadyQueuedCallbacks() {
         SessionCallbacks callbacks = new SessionCallbacks();
         AtomicInteger calls = new AtomicInteger();

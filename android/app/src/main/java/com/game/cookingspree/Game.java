@@ -38,14 +38,20 @@ public class Game {
     private final PotThreadPool potThreadPool;
     private final BasketManager basketManager;
     private final PotFunctions.PotListener potListener;
+    private final PauseState pauseState;
 
 public Game(GameView gameView, Context context, PlayerInventory playerInventory,PotThreadPool potThreadPool,BasketManager basketManager, PotFunctions.PotListener potListener) {
+    this(gameView, context, playerInventory, potThreadPool, basketManager, potListener, new PauseState());
+}
+
+public Game(GameView gameView, Context context, PlayerInventory playerInventory,PotThreadPool potThreadPool,BasketManager basketManager, PotFunctions.PotListener potListener, PauseState pauseState) {
     this.gameView = gameView;
     this.context = context;
     this.playerInventory = playerInventory;
     this.potThreadPool=potThreadPool;
     this.basketManager=basketManager;
     this.potListener=potListener;
+    this.pauseState = pauseState;
 
     playerBitmap = BitmapFactory.decodeResource(context.getResources(), R.drawable.player);
     loadMapFromJson(); // also handles creation of player
@@ -136,7 +142,7 @@ public Game(GameView gameView, Context context, PlayerInventory playerInventory,
 
                         switch (type) {
                             case "pot":
-                                Pot pot=new Pot(context,x,y,props,potThreadPool,potListener);
+                                Pot pot=new Pot(context,x,y,props,potThreadPool,potListener,pauseState);
                                 interactable.add(pot);
                                 pots.add(pot);//To assist in saving their contents
                                 break;
@@ -208,7 +214,7 @@ public Game(GameView gameView, Context context, PlayerInventory playerInventory,
     }
 
     public void update() {
-        if (player != null) player.update();
+        if (pauseState.isMovementAllowed() && player != null) player.update();
     }
 
     public long getSleepTime() {
@@ -218,6 +224,7 @@ public Game(GameView gameView, Context context, PlayerInventory playerInventory,
 
     // Called when player presses the 'interact' button (uses proximity check)
     public void interact() {
+        if (!pauseState.isRunning()) return;
 
         // Use proximity check for button-based interaction
         for (Interactable obj : interactable) {
@@ -246,16 +253,22 @@ public Game(GameView gameView, Context context, PlayerInventory playerInventory,
         return gameManager;
     }
 
+    public boolean isGameplayRunning() { return pauseState.isRunning(); }
+    public boolean isMovementAllowed() { return pauseState.isMovementAllowed(); }
+    boolean runGameplayIfRunning(Runnable action) { return pauseState.runIfRunning(action); }
+    boolean runMovementIfAllowed(Runnable action) { return pauseState.runIfMovementAllowed(action); }
+    boolean isSessionFinished() { return pauseState.isTerminal() || !pauseState.isRunning() && gameManager != null && gameManager.isClosed(); }
+
 
     public Player getPlayer() {
         return player;
     }
 
     //Player movement
-    public void moveUp()    { player.move(0, -1); }
-    public void moveDown()  { player.move(0, 1); }
-    public void moveLeft()  { player.move(-1, 0); }
-    public void moveRight() { player.move(1, 0); }
+    public void moveUp()    { if (player != null && pauseState.isMovementAllowed()) player.move(0, -1); }
+    public void moveDown()  { if (player != null && pauseState.isMovementAllowed()) player.move(0, 1); }
+    public void moveLeft()  { if (player != null && pauseState.isMovementAllowed()) player.move(-1, 0); }
+    public void moveRight() { if (player != null && pauseState.isMovementAllowed()) player.move(1, 0); }
     public boolean canMoveTo(float nextX, float nextY) {
         // Create a rectangle representing the player's position
         RectF playerRect = new RectF(

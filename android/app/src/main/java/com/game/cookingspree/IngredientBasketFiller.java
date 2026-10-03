@@ -20,15 +20,21 @@ public class IngredientBasketFiller {
     private final AtomicBoolean closed = new AtomicBoolean();
     private final Object mutationLock = new Object();
     private volatile boolean waitingForIngredient;
+    private final PauseState pauseState;
 
     public interface BasketFillListener{
         void finishedBasketFilling(List<Ingredient> fillOrder);
     }
 
     public IngredientBasketFiller(IngredientQueue queue, BasketManager basketManager,Integer fillSize) {
+        this(queue, basketManager, fillSize, new PauseState());
+    }
+
+    public IngredientBasketFiller(IngredientQueue queue, BasketManager basketManager,Integer fillSize, PauseState pauseState) {
         this.queue = queue;
         this.basketManager = basketManager;
         this.fillSize=fillSize;
+        this.pauseState=pauseState;
     }
 
     public void startFilling(BasketFillListener listener) {
@@ -38,6 +44,13 @@ public class IngredientBasketFiller {
                 List<Ingredient> fillOrder=new ArrayList<>();
 
                 for (int i=fillSize-1;i> -1;i--){
+                        final int targetBasket = i;
+                        try {
+                            if (!pauseState.awaitActiveDuration(0)) return;
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
                         // Take ingredient from queue (blocks if no ingredient inside)
                          Ingredient ingredient=null;
                          try {
@@ -52,19 +65,39 @@ public class IngredientBasketFiller {
 
                          if (closed.get() || Thread.currentThread().isInterrupted()) return;
                          if (ingredient!=null){
-                             synchronized (mutationLock) {
-                                 if (closed.get() || Thread.currentThread().isInterrupted()) return;
-                                 basketManager.updateBasketContents(i, ingredient);
+                             final Ingredient fillIngredient = ingredient;
+                             boolean applied = false;
+                             while (!applied && !closed.get() && !Thread.currentThread().isInterrupted()) {
+                                 try {
+                                     applied = pauseState.runIfRunning(() -> {
+                                         synchronized (mutationLock) {
+                                             if (!closed.get() && !Thread.currentThread().isInterrupted()) basketManager.updateBasketContents(targetBasket, fillIngredient);
+                                         }
+                                     });
+                                     if (!applied && !pauseState.awaitActiveDuration(0)) return;
+                                 } catch (InterruptedException e) {
+                                     Thread.currentThread().interrupt();
+                                     return;
+                                 }
                              }
+                             if (!applied) return;
 
-                             Log.d(TAG, "filled basket with: " + ingredient.getName() + " at basket " + i);
-                             fillOrder.add(ingredient);
+                             Log.d(TAG, "filled basket with: " + fillIngredient.getName() + " at basket " + i);
+                             fillOrder.add(fillIngredient);
                          }else{
                              Log.e(TAG,"Failed to add an ingredient at basket"+i);
                          }
                 }
                 if (!closed.get() && !Thread.currentThread().isInterrupted() && listener != null) {
-                    listener.finishedBasketFilling(fillOrder);
+                    while (!pauseState.runIfRunning(() -> listener.finishedBasketFilling(fillOrder))) {
+                        try {
+                            if (!pauseState.awaitActiveDuration(0)) return;
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                        if (closed.get() || Thread.currentThread().isInterrupted()) return;
+                    }
                 }
             });
         } catch (RejectedExecutionException ignored) {
