@@ -46,7 +46,7 @@ For a decision that changes architecture, persistence/data compatibility, platfo
 
 ## Documentation is part of the change
 
-Every behavior, architecture, build, test, persistence, map, asset, or workflow change has a documentation owner: the agent making the change. Before handoff, update the applicable file under `docs/` and its links/index if the navigation changed. Remove or correct superseded claims; do not append a stale historical layer. See [docs/doc-maintenance.md](docs/doc-maintenance.md).
+Every behavior, architecture, build, test, persistence, map, asset, or workflow change has a documentation owner: the agent making the change. Before handoff, update the applicable file under `docs/` and its links/index if the navigation changed. Add or update diagrams whenever architecture, sequence, state, data relationships, or another idea is more quickly understood visually; keep the diagram beside the contract it explains. Remove or correct superseded claims; do not append a stale historical layer. Follow the diagram selection and maintenance rules in [docs/doc-maintenance.md](docs/doc-maintenance.md).
 
 ## Project boundaries
 
