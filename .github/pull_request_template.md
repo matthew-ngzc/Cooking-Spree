@@ -60,6 +60,7 @@ Redact account details, tokens, Firebase configuration, and other sensitive data
 ## Documentation
 
 - [ ] Updated the applicable docs under `docs/`.
+- [ ] Added/updated relevant architecture, sequence, state, flow, or data-model diagrams; or explained why no diagram helps.
 - [ ] Updated `docs/README.md` if documentation navigation changed.
 - [ ] Added/updated an ADR if this changes a material commitment.
 
