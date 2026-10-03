@@ -6,12 +6,12 @@
 
 **Outcome:** a reproducibly buildable Android app whose existing single-player loop can be played, paused, saved, loaded, and ended while signed out and offline, without the validated crashes, destructive saves, duplicate tutorial sessions, or abandoned background work.
 
-**Status:** implementation authorized by the owner on 2026-10-03. ADR 0003 remains a separate owner-acceptance gate before slices 0D and 0E.
+**Status:** implementation authorized by the owner on 2026-10-03. ADR 0003 was accepted by the owner on 2026-10-04, unlocking its dependent slices 0D and 0E.
 
 ## Phase progress
 
 - [ ] Owner approves this Phase 0 implementation contract. Implementation was requested on 2026-10-03, but this owner-only checkbox remains for the owner to mark directly.
-- [ ] Owner accepts ADR 0003 before slices 0D and 0E.
+- [x] Owner accepts ADR 0003 before slices 0D and 0E. Evidence: the owner explicitly accepted ADR 0003 on 2026-10-04.
 - [x] 0A — Verify and stabilise the build. Evidence: clean wrapper build and unit tests passed on 2026-10-03; instrumentation APK compiled after correcting the application-package assertion. See [development verification](../docs/development.md#current-verified-build-state).
 - [x] 0B — Signed-out and unavailable-cloud safety. Evidence: focused tests plus the API 36 signed-out/airplane-mode launch, settings restart, and natural game-over run recorded in [development verification](../docs/development.md#current-verified-build-state).
 - [x] 0C — Single session, cancellation, and render/input teardown. Evidence: focused unit/device lifecycle checks and five repeated actual surface cycles passed; see [runtime architecture verification](../docs/architecture.md#concurrency-boundaries).
@@ -25,7 +25,7 @@ Inputs:
 - [Corrected repository review](../docs/reports/2026-09-21-repository-review.md), checked against source on 2026-10-01.
 - [Accepted direction](../docs/direction.md), [ADR 0001: delivery](../docs/decisions/0001-agent-governance-and-delivery.md), and [ADR 0002: offline-first direction](../docs/decisions/0002-offline-first-competition-direction.md).
 - [Existing Phase 0 outline](../docs/roadmap.md): its build, test, offline, smoke-test, and owner-review criteria are incorporated here; this file supplies the missing bounded slices.
-- [Proposed ADR 0003](../docs/decisions/0003-phase-zero-session-and-save-boundaries.md): session ownership, pause behavior, and legacy-save compatibility. Owner acceptance is required before implementing those decisions.
+- [Accepted ADR 0003](../docs/decisions/0003-phase-zero-session-and-save-boundaries.md): session ownership, pause behavior, and legacy-save compatibility. Accepted by the owner on 2026-10-04.
 - Inbox context: [account/local play](../docs/ideas/inbox.md#account-local-play-and-cloud-save), [preference validation](../docs/ideas/inbox.md#preference-migration-and-account-validation), and [game quality/tutorial](../docs/ideas/inbox.md#game-quality-and-tutorial). Only the defect recovery described here is proposed; broader inspirations remain uncommitted.
 
 ## Scope and explicit deferrals
@@ -174,7 +174,7 @@ Tasks:
 ## Dependencies and owner involvement
 
 - The orchestrator can investigate/fix the build, delegate bounded Luna work, write tests, review changes, and prepare a PR after this plan is approved and execution is requested.
-- Owner review covers the detailed scope and proposed ADR 0003 before dependent work. No live Firebase access or backend changes are required for this phase's guest/offline gates.
+- Owner review of the detailed scope remains required; ADR 0003 was accepted on 2026-10-04. No live Firebase access or backend changes are required for this phase's guest/offline gates.
 - A compatible device/emulator is required for completion evidence. The agent owns the environment preflight/setup above and can launch a configured AVD without Android Studio. Ask the owner only for an actual missing prerequisite the agent cannot resolve or device-only observations needing their participation.
 - If the chosen fix would reset valid saves, replace the save schema, alter cloud conflict behavior, change gameplay balance, or expand platforms, stop that dependent work and present a revised concrete proposal. Do not infer approval from this plan.
 

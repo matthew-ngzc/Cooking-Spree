@@ -4,7 +4,7 @@ Purpose: hold short, durable records of material decisions so agents do not redi
 
 Create an ADR for decisions affecting product commitments, architecture, persistence compatibility, platform scope, online/multiplayer design, security, deployment, or repository structure. The user has final approval: use `Proposed` until they explicitly accept it.
 
-Accepted decisions include [ADR 0004 — Project-root repository](0004-project-root-repository.md), [ADR 0005 — Android project directory](0005-android-project-directory.md), and [ADR 0006 — Session-scoped cloud profile sync](0006-session-scoped-cloud-profile-sync.md).
+Accepted decisions include [ADR 0003 — Phase 0 session and save boundaries](0003-phase-zero-session-and-save-boundaries.md), [ADR 0004 — Project-root repository](0004-project-root-repository.md), [ADR 0005 — Android project directory](0005-android-project-directory.md), and [ADR 0006 — Session-scoped cloud profile sync](0006-session-scoped-cloud-profile-sync.md).
 
 ## Format
 

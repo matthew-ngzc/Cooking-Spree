@@ -15,7 +15,7 @@ Purpose: route an agent to the smallest document needed to work safely. This dir
 | Pick up known product/technical work | [roadmap.md](roadmap.md) |
 | See the long-term goal, phase summaries, and links to phase plans and ideas | [Overarching Android roadmap](../plans/android-roadmap.md) |
 | Execute the detailed Phase 0 baseline recovery contract | [Phase 0 plan](../plans/phase-0-baseline-recovery.md) |
-| Record or evaluate a material product/technical decision | [decisions/README.md](decisions/README.md); [repository layout](decisions/0004-project-root-repository.md); [proposed Phase 0 boundaries](decisions/0003-phase-zero-session-and-save-boundaries.md); [accepted session cloud-sync policy](decisions/0006-session-scoped-cloud-profile-sync.md) |
+| Record or evaluate a material product/technical decision | [decisions/README.md](decisions/README.md); [repository layout](decisions/0004-project-root-repository.md); [accepted Phase 0 boundaries](decisions/0003-phase-zero-session-and-save-boundaries.md); [accepted session cloud-sync policy](decisions/0006-session-scoped-cloud-profile-sync.md) |
 | Understand the accepted Android project directory name | [ADR 0005 — Android project directory](decisions/0005-android-project-directory.md) |
 | See the evidence behind the agent workflow | [research/matt-pocock-agentic-workflow.md](research/matt-pocock-agentic-workflow.md) |
 | Read the repository review, corrected against current code on 2026-10-01 | [reports/2026-09-21-repository-review.md](reports/2026-09-21-repository-review.md) |
