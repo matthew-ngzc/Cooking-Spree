@@ -26,6 +26,7 @@ These checkboxes track progress but do not authorize implementation while this f
 - [ ] Google account identity and a Cloud Profile containing profile details, settings, lifetime statistics, and high score. Active games remain device-local.
 - [ ] Implement [ADR 0006](../docs/decisions/0006-session-scoped-cloud-profile-sync.md): compare complete device/cloud profiles at most once per cold app start; show identifying facts and **Use this device**, **Use cloud**, or **Not now** on divergence; retain the resulting device-only/cloud-sync mode without another prompt for that active session.
 - [ ] Namespace local account profiles, add complete-snapshot metadata including last-updated time, and make each logical multi-field update one atomic cloud attempt. Preserve local success on cloud failure and show one Continue/Report issue alert per failed logical save without exposing sensitive data.
+- [ ] Use **cloud** in every player-facing sync label, prompt, and error. Keep Firestore, Firebase, database, and provider names confined to implementation documentation and non-sensitive engineering diagnostics.
 - [ ] Authenticated Google-account score submission and global all-time ranking, followed by adding friends through Chef Codes and friends-only ranking.
 - [ ] Cloud/backend correctness and failure behavior, including numeric settings hydration, nested profile query/UID paths, Chef Code uniqueness, and cloud reads echoing writes.
 - [ ] Firestore rules and backend schema validation before treating the online feature as ready.
