@@ -32,13 +32,16 @@ MainActivity ──> GameActivity / TutorialActivity
 | Map objects | `Game` | Lists are built once from the map. |
 | Pot contents/state | `Pot`, `PotFunctions` | Cooking runs on a shared executor. |
 | Basket contents / available ingredients | `BasketManager`, `IngredientFetchWorker` | Fetcher uses a producer/consumer queue to refill baskets. |
-| Orders, score, failures, pause | `GameManager` | Main-thread handlers schedule spawning and 16-ms ticks. |
+| Orders, score, failures | `GameManager` | Main-thread handlers schedule spawning and 16-ms ticks. Spawn delay and order elapsed time stop across pauses. |
+| Pause reasons / active time | Session `PauseState`, coordinated by `GameManager` | Manual menu, background, and tutorial pauses are independent; terminal and closed are final. Worker durations consume active time only. |
 | Activity/HUD state | `GameActivity` | Receives callbacks and updates Android views. |
 | Session workers | Owning activity session | Activity close stops manager handlers, interrupts the pot pool and fetcher, and the fetcher closes its filler and queue. |
 
 ## Concurrency boundaries
 
-`GameManager` handlers run on the main looper, while `PotThreadPool`, `IngredientFetchWorker`, and `IngredientBasketFiller` use executors. Closing an owner is idempotent, prevents later submissions, removes manager callbacks, and interrupts sleeps and queue waits. The fetcher owns and closes its filler; queue closure wakes both producer and consumer waiters. Interrupted cooking exits before producing food or reporting progress. The pot receives a narrow `PotFunctions.PotListener`, not an Activity cast.
+`GameManager` handlers run on the main looper, while `PotThreadPool`, `IngredientFetchWorker`, and `IngredientBasketFiller` use executors. A session `PauseState` serializes pause transitions with gameplay mutations and callbacks and supplies active-time waits to cooking and ingredient exchange/filling, so work retains its remaining duration across pause. The manager keeps the remaining order-spawn delay and pauses each active order timer. `Game` and `Player` reject gameplay input and stop movement updates whenever the shared session state is paused or terminal, with one explicit tutorial-only movement allowance. That allowance never makes the gameplay session running and is blocked by manual pause, backgrounding, terminal state, or closure. Background resume clears only the background reason; a manual menu or tutorial pause remains in effect. The tutorial installs its pause before manager startup, so no hidden order schedule is created.
+
+Closing an owner is idempotent, prevents later submissions, removes manager callbacks, and interrupts waits and queue waits. The fetcher owns and closes its filler; queue closure wakes both producer and consumer waiters. Interrupted cooking exits before producing food or reporting progress. The pot receives a narrow `PotFunctions.PotListener`, not an Activity cast. `GameManager` rejects repeated game-over finalization, and an Activity-side `FinalizationGate` ensures the dialog, local statistics update, and saved-run clear are each applied once.
 
 Worker UI callbacks post through a session gate and check it again when the main-thread runnable executes. A callback already in the message queue is therefore discarded after activity destruction. Held-direction callbacks are tracked per control and all removed on pause, stop, and destruction; releasing one of two held controls leaves the other active.
 

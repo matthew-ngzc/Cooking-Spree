@@ -29,7 +29,7 @@ Run Gradle from `android/` in PowerShell. Run Git commands from the project root
 .\gradlew.bat connectedDebugAndroidTest
 ```
 
-The last command needs a running emulator or connected device. The committed unit/instrumented test classes are starter examples only; a green test task is build coverage, not gameplay coverage.
+The last command needs a running emulator or connected device. The committed unit and instrumented suites now include focused Phase 0 regressions, but a green task still does not replace the manual acceptance matrix.
 
 ## Current verified build state
 
@@ -38,6 +38,8 @@ On 2026-10-03, after Phase 0 slice 0B changes, `testDebugUnitTest` and `assemble
 Also on 2026-10-03, `connectedDebugAndroidTest` passed on a fresh temporary-data `Medium_Phone_API_36` AVD (`emulator-5556`, API 36, x86_64, 1080×2400 at 420 dpi). With airplane mode enabled and no signed-in user, the menu and a new game launched successfully. Changing volume to `19` and joystick size to large (`1.4`) persisted across an app restart. Letting three orders expire produced one game-over path; local games played became `1`, average score remained `0`, and `GameSave` was empty after completion. The nonzero high-score calculation and simulated cloud failure remain covered by `SessionAndPersistenceTest`; no live backend was required.
 
 On 2026-10-03, `clean`, `assembleDebug`, `testDebugUnitTest`, and `assembleDebugAndroidTest` completed successfully from `android/` using the configured Gradle 8.11.1 wrapper. The app and unit-test tasks succeeded after clearing generated build outputs, so they were rebuilt from tracked project inputs. The instrumentation APK compiled with the corrected expected package name `com.game.cookingspree`, matching the configured application ID. The build emitted non-fatal warnings for the manifest's legacy `package` attribute, deprecated API use, and unchecked operations. That clean 0A baseline did not itself run on a device; the subsequent API 36 device validation is recorded above and in [runtime architecture](architecture.md#concurrency-boundaries).
+
+On 2026-10-04, after Phase 0 slice 0D, `testDebugUnitTest`, `assembleDebug`, and `assembleDebugAndroidTest` passed. `connectedDebugAndroidTest` passed 8/8 on `Medium_Phone_API_36` (API 36). The new device scenarios verify that tutorial movement does not resume order/cook/fetch work, manual pause survives a background/foreground cycle, a running game resumes after backgrounding, and active cooking and ingredient exchange remain unchanged through a 10-second pause before completing once after resume. A labelled screenshot sequence records the visible running, paused, background-return, explicit-resume, tutorial, movement-only, and post-skip states for the slice 0D PR.
 
 ## Manual smoke test
 
