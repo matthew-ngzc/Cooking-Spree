@@ -195,13 +195,16 @@ public class Pot extends Interactable {
         synchronized (stateLock) {
             switch (state) {
                 case EMPTY:
-                    currentPotSprite = sprite = emptySprite;
+                    sprite = emptySprite;
+                    currentPotSprite = emptySprite;
                     break;
                 case COOKING:
-                    currentPotSprite = sprite = cookingSprite;
+                    sprite = cookingSprite;
+                    currentPotSprite = cookingSprite;
                     break;
                 case DONE:
-                    currentPotSprite = sprite = doneSprite;
+                    sprite = doneSprite;
+                    currentPotSprite = doneSprite;
                     break;
             }
         }
