@@ -28,7 +28,7 @@ Friends ranking is nearly as important as the global leaderboard, but follows it
 - Only authenticated Google-account scores are eligible for the first online leaderboard. The first leaderboard is global and all-time; seasons and remote multiplayer are deferred.
 - The first leaderboard may treat submitted scores as trusted casual competition. Stronger validation/anti-cheat is a later fairness/security decision.
 - A Cloud Profile contains profile details, settings, lifetime statistics, and high score. An active in-progress game remains device-local in the first version.
-- On first account sign-in where local data exists, and whenever local/cloud data diverges, show a sync prompt. Present key facts for each complete profile (including high score, games played, and last-updated time) and let the player choose **Use this device** or **Use cloud**. Do not silently merge or overwrite a profile.
+- At cold app-session startup, display the device profile first and compare it with Firestore at most once when a Google account is already authenticated. If the complete profiles differ, present key facts for each and let the player choose **Use this device**, **Use cloud**, or **Not now**. That choice selects cloud-sync or device-only behavior for the rest of the active session; never silently merge or overwrite a profile, and do not repeat the prompt during play. Cloud-write failure preserves the local update and produces one actionable, non-sensitive failure alert per logical save attempt. See [ADR 0006](decisions/0006-session-scoped-cloud-profile-sync.md).
 - Friends are added through Chef Codes, never raw backend IDs. Friends-only ranking is a near-term Competition-phase feature after the global leaderboard.
 
 ## Explicit exclusions

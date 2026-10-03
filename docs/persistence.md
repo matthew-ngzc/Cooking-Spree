@@ -22,10 +22,17 @@ Expected Firestore document: `chefs/{uid}` with `profile`, `stats`, and `setting
 
 The initial joystick radio selection is hydrated from the local setting before its user-change listener is installed, in both the menu settings and game settings. Completing a game updates local high score, average score, and games played, then clears `GameSave`; the focused unit seam uses a fake local stats store and does not require Firebase.
 
+## Accepted Phase 1 sync behavior
+
+[ADR 0006](decisions/0006-session-scoped-cloud-profile-sync.md) defines the replacement for the current unfinished synchronization. At cold startup, the app will show device data immediately, attempt at most one authenticated cloud comparison, and establish either device-only or cloud-sync mode for the remainder of that process session. A differing cloud profile must not overwrite local data without an explicit **Use this device**, **Use cloud**, or **Not now** choice. In cloud-sync mode, a logical multi-field update writes locally first and attempts one atomic Firestore update; failure retains local data and shows one Continue/Report issue alert. This is accepted Phase 1 scope and is not implemented by the current field-by-field adapter.
+
+The comparison snapshot will include chef name, high score, games played, and last-updated time. Account level is not currently part of the game/profile model and may be displayed only after a separate level-system decision and implementation. Local account-linked profiles must be namespaced by authenticated account so multiple Google users on one device cannot overwrite one another's cache. Active in-progress games remain device-local.
+
 ## Change checklist
 
 - Maintain a local-first outcome for settings/gameplay data unless the user explicitly changes the product decision.
 - Keep optional Firebase writes asynchronous and signed-out safe; local writes must not depend on cloud task success.
 - Test signed-out, no-network, first sign-in, returning sign-in, and failed Firebase requests when changing account code.
+- Test device/cloud equality, all three conflict choices, one-prompt-per-cold-start behavior, account switching, atomic logical updates, retry after a failed cloud write, and one failure alert per logical update.
 - Avoid logging identity tokens, UIDs, email addresses, or raw preference dumps.
 - Document any schema change here, including migration and rollback behavior.
