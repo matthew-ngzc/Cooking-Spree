@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.*;
 
-public class Phase0PersistenceTest {
+public class SessionAndPersistenceTest {
     @Test
     public void sessionClosureIsIdempotentAndSuppressesAlreadyQueuedCallbacks() {
         SessionCallbacks callbacks = new SessionCallbacks();
