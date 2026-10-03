@@ -25,6 +25,7 @@ These checkboxes track progress but do not authorize implementation while this f
 
 - [ ] Google account identity and a Cloud Profile containing profile details, settings, lifetime statistics, and high score. Active games remain device-local.
 - [ ] Implement [ADR 0006](../docs/decisions/0006-session-scoped-cloud-profile-sync.md): compare complete device/cloud profiles at most once per cold app start; show identifying facts and **Use this device**, **Use cloud**, or **Not now** on divergence; retain the resulting device-only/cloud-sync mode without another prompt for that active session.
+- [ ] Add a signed-in **Sync with cloud** action in the account/profile area. On request, re-read and compare complete profiles from either session mode; report equality, preserve local data on an unavailable cloud, and require the normal explicit source choice on divergence.
 - [ ] Namespace local account profiles, add complete-snapshot metadata including last-updated time, and make each logical multi-field update one atomic cloud attempt. Preserve local success on cloud failure and show one Continue/Report issue alert per failed logical save without exposing sensitive data.
 - [ ] Use **cloud** in every player-facing sync label, prompt, and error. Keep Firestore, Firebase, database, and provider names confined to implementation documentation and non-sensitive engineering diagnostics.
 - [ ] Authenticated Google-account score submission and global all-time ranking, followed by adding friends through Chef Codes and friends-only ranking.
@@ -35,7 +36,7 @@ These checkboxes track progress but do not authorize implementation while this f
 
 Use Phase 0 verification evidence and the actual resulting sync/session boundaries when drafting tasks. Backend schema/rules access and owner-approved competition acceptance criteria are needed. Carry forward the unresolved account findings from the [repository review](../docs/reports/2026-09-21-repository-review.md); validate them against the code at planning time.
 
-The detailed plan will add bounded slices, affected files, tests for guest/offline/network/account failures, all conflict-choice and session-mode scenarios from ADR 0006, ranking acceptance criteria, documentation owners, and proposed backend/compatibility decisions. It must also define the issue-report destination and redacted diagnostic payload. Account level is not currently a profile field; include it in the comparison UI only if a separate progression decision adds it. Draft the plan at Phase 0 closeout before implementation begins.
+The detailed plan will add bounded slices, affected files, tests for guest/offline/network/account failures, all automatic and manual conflict-choice/session-mode scenarios from ADR 0006, ranking acceptance criteria, documentation owners, and proposed backend/compatibility decisions. It must also define the issue-report destination and redacted diagnostic payload. Account level is not currently a profile field; include it in the comparison UI only if a separate progression decision adds it. Draft the plan at Phase 0 closeout before implementation begins.
 
 ## Boundaries and related ideas
 

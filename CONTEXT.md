@@ -13,3 +13,4 @@ Purpose: canonical product vocabulary. It intentionally contains no implementati
 | Chef Code | A human-shareable identifier used to add a friend; it is distinct from an internal Firebase user ID. |
 | Cloud profile | The Google-account-backed durable profile containing settings, lifetime statistics, and high score. It excludes an in-progress game. |
 | Device profile | The durable profile held locally on one device. It is the source of truth until the player explicitly selects it or the cloud profile during a sync conflict. |
+| Manual cloud sync | A player-initiated comparison of the complete device and cloud profiles. It may revisit the session's earlier choice, but it never silently chooses one profile when they differ. |
