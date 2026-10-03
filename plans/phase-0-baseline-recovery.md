@@ -18,7 +18,21 @@
 - [ ] 0D — Consistent pause and tutorial lifecycle.
 - [ ] 0E — Non-destructive saves and validated legacy loading.
 - [ ] 0F — Integration evidence and delivery.
-- [ ] Owner approves the Phase 0 PR.
+- [ ] Owner approves and merges each Phase 0 PR.
+- [ ] Owner approves Phase 0 closeout after all delivery-map PRs are merged and the phase evidence is complete.
+
+## PR delivery map
+
+Each PR becomes ready for review when its own gate below is met. After making it ready, continue with the next PR without waiting for owner review or merge unless a listed blocker applies. When its predecessor is still unmerged, create the next PR as a stack based on the predecessor branch; after the predecessor merges, retarget or rebase it onto the normal integration branch. Owner review is required for every PR, and the agent must not merge them.
+
+| PR | Assigned scope | Base and mergeability | Ready-for-review gate | Next work |
+| --- | --- | --- | --- | --- |
+| 1 — baseline and session safety ([current PR #2](https://github.com/matthew-ngzc/Cooking-Spree/pull/2)) | 0A–0C plus the decisions and delivery documentation created with that work | Targets the normal integration branch and can merge independently | 0A–0C gates remain satisfied; docs and commit walkthroughs are current; required lifecycle/device evidence is attached or any unavailable evidence is explicit | Begin PR 2 without waiting unless review could change the 0D contract |
+| 2 — pause and tutorial lifecycle | 0D | Depends on PR 1; stack on PR 1 while it is unmerged, then retarget/rebase after PR 1 merges | 0D tasks, tests, gate, owning docs, walkthroughs, and API 34+ device evidence are complete | Begin PR 3 without waiting unless 0D findings or owner feedback change persistence assumptions |
+| 3 — safe save and legacy load | 0E | Depends on PR 2; stack on PR 2 while it is unmerged, then retarget/rebase as predecessors merge | 0E tasks, tests, gate, owning docs, walkthroughs, and API 34+ save/load evidence are complete | Begin PR 4 without waiting unless save compatibility needs a new owner decision |
+| 4 — integration and phase closeout | 0F and the complete manual acceptance matrix | Depends on PRs 1–3; stack on the latest predecessor while any remain unmerged | 0F tasks and gate are complete; full Phase 0 evidence, documentation, deferred risks, and final walkthroughs are current | Await owner review/merges and the separate Phase 0 closeout approval |
+
+Blocking actions are limited to an unresolved owner/product or ADR decision, a genuinely unavailable device/external prerequisite, predecessor feedback likely to invalidate the next slice, or an inability to isolate the stacked diff safely. Ordinary pending review or merge is not a blocker.
 
 Inputs:
 
@@ -150,9 +164,9 @@ Tasks:
 2. [ ] Run `gradlew.bat assembleDebug` and `gradlew.bat testDebugUnitTest`. With an attached API 34+ emulator/device, run `gradlew.bat connectedDebugAndroidTest`. Record command, result, date, device/API for device checks, and the behavior each test protects. A skipped check is not a pass.
 3. [ ] Complete the smoke matrix below offline/signed out. Repeat lifecycle entry/exit and surface recreation checks at least five times. Test game-over save/stat behavior both from a new session and from a loaded one.
 4. [ ] Update the owning documentation with actual final behavior, commands, limitations, and accepted decisions. Mark individual report findings resolved only with a source/test reference and date; keep deferred findings visible. Do not rewrite the report as if the original findings never existed.
-5. [ ] Review all Luna changes against this contract, confirm no accidental configuration/asset exposure, and prepare a PR using `.github/pull_request_template.md`. Include changelog, reason, material trade-offs, relevant decisions, deferred risks, command/test results, and device evidence. Attach labelled screenshots for every materially changed scene, using before/after views when useful; attach a short recording or concise screenshot sequence for interaction or lifecycle behavior that a still image cannot prove. Record the device/emulator and API level, note any unverified scenario, and redact sensitive data. Commit messages follow Conventional Commits. The owner approves the PR; do not merge automatically.
+5. [ ] Review all Luna changes against this contract, confirm no accidental configuration/asset exposure, and finalize the Phase 0 integration/closeout PR using `.github/pull_request_template.md`. Include changelog, reason, material trade-offs, relevant decisions, deferred risks, command/test results, and device evidence. Attach labelled screenshots for every materially changed scene, using before/after views when useful; attach a short recording or concise screenshot sequence for interaction or lifecycle behavior that a still image cannot prove. Record the device/emulator and API level, note any unverified scenario, and redact sensitive data. Commit messages follow Conventional Commits. Do not merge automatically.
 
-- [ ] **0F gate:** evidence supports every Phase 0 criterion and the owner approves the PR. Without device evidence, status is implementation complete/device verification pending, not Phase 0 complete.
+- [ ] **0F gate:** evidence supports every Phase 0 criterion and the integration/closeout PR satisfies its ready-for-review gate. Without device evidence, status is implementation complete/device verification pending, not ready for review. Phase completion remains separate: every delivery-map PR must be approved and merged by the owner, followed by owner approval of Phase 0 closeout.
 
 ## Manual acceptance checklist
 
