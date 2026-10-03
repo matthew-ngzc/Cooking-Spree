@@ -26,6 +26,19 @@ The versioned format remains coupled to table/pot map ordering even though ingre
 
 Expected Firestore document: `chefs/{uid}` with `profile`, `stats`, and `settings` nested maps. The code also sketches social/following functionality, but it is not a complete feature.
 
+Firestore is a NoSQL document database, so this project documents its shape as collections, documents, and nested maps rather than as relational tables:
+
+```mermaid
+flowchart LR
+    Chefs[(chefs collection)] -->|one document per authenticated account| Chef["chefs/{uid}"]
+    Chef --> Profile["profile map<br/>uid, email, chefName, chefCode,<br/>photoUrl, dailyStreak"]
+    Chef --> Stats["stats map<br/>gamesPlayed, highScore, averageScore"]
+    Chef --> Settings["settings map<br/>joystickScale, volume, language"]
+    Chef -. unfinished .-> Following["following array in current writes<br/>social contract not settled"]
+```
+
+The diagram describes the document written by profile creation. Some unfinished social queries still look for `chefCode` and `uid` at the document root, and the comments describe `following` as a map while current writes use an array. Treat those mismatches as known defects, not as alternate schema definitions.
+
 `BaseActivity.onCreate()` initializes `PrefsHelper` with the application context and an Activity-free cloud sync adapter. Credential prompts remain owned by the foreground `MainActivity`'s `AccountManager`; the static preference helper does not retain an Activity. Preference and aggregate-stat setters commit to `chef_prefs` first, then request an asynchronous cloud update only when a current Firebase user exists. Synchronous adapter failures and asynchronous Firestore task failures produce a bounded diagnostic containing only the exception type. Remote cache hydration suppresses those upload calls, so loading account values is not treated as a user edit. Firebase initialization or sync failure leaves the local guest path available. Cloud sync remains optional and is not presented as production-ready.
 
 The initial joystick radio selection is hydrated from the local setting before its user-change listener is installed, in both the menu settings and game settings. Completing a game updates local high score, average score, and games played, then clears `GameSave`; the focused unit seam uses a fake local stats store and does not require Firebase.
@@ -35,6 +48,36 @@ The initial joystick radio selection is hydrated from the local setting before i
 [ADR 0006](decisions/0006-session-scoped-cloud-profile-sync.md) defines the replacement for the current unfinished synchronization. At cold startup, the app will show device data immediately, attempt at most one authenticated cloud comparison, and establish either device-only or cloud-sync mode for the remainder of that process session. A differing cloud profile must not overwrite local data without an explicit **Use this device**, **Use cloud**, or **Not now** choice. A signed-in **Sync with cloud** action in the account/profile area may repeat the complete comparison when deliberately requested, including after **Not now** or offline write failures; divergence uses the same explicit source choices. In cloud-sync mode, a logical multi-field update writes locally first and attempts one atomic cloud update; failure retains local data and shows one Continue/Report issue alert. All player-facing copy must say **cloud**, never Firestore, Firebase, database, or another provider name. This is accepted Phase 1 scope and is not implemented by the current field-by-field adapter.
 
 The comparison snapshot will include chef name, high score, games played, and last-updated time. Account level is not currently part of the game/profile model and may be displayed only after a separate level-system decision and implementation. Local account-linked profiles must be namespaced by authenticated account so multiple Google users on one device cannot overwrite one another's cache. Active in-progress games remain device-local.
+
+The accepted future session flow is:
+
+```mermaid
+sequenceDiagram
+    actor Player
+    participant App
+    participant Device as Device profile
+    participant Cloud as Cloud profile
+
+    App->>Device: Load and show immediately
+    App->>Cloud: Compare once at cold startup
+    alt Cloud unavailable
+        App-->>Player: Continue with device profile
+    else Profiles match
+        App->>App: Enable cloud-sync mode for this session
+    else Profiles differ
+        App-->>Player: Show identifying stats and ask which copy to use
+        Player->>App: Use this device, Use cloud, or Not now
+    end
+    opt Player manually chooses Sync with cloud later
+        App->>Cloud: Repeat full comparison
+    end
+    opt A game update occurs in cloud-sync mode
+        App->>Device: Save locally first
+        App->>Cloud: Attempt one atomic logical update
+        Cloud--xApp: Write can fail
+        App-->>Player: Continue or Report issue; device save remains
+    end
+```
 
 ## Change checklist
 
