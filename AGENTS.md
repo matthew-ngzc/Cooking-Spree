@@ -22,9 +22,19 @@ Read [docs/direction.md](docs/direction.md) before proposing product work and [p
 
 ## Change, commit, and PR contract
 
-Agents may commit and open pull requests. Use [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) for commit messages. A PR must contain a clear changelog, the reason for the change, material decisions/trade-offs, verification evidence, and the associated documentation updates. The user reviews every PR and has final approval; opening a PR never authorizes a merge.
+Agents may commit and open pull requests. Use [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) for commit messages. Split implementation into small commits, each representing one coherent purpose. Open the PR as a draft when the first reviewable commit is available, keep it current throughout implementation, and convert it to ready for review only after the final planned slice, documentation, verification, and evidence are complete. The user reviews every PR and has final approval; opening or finalizing a PR never authorizes a merge.
 
-Every PR, in every phase and for work outside the roadmap, must include evidence that makes the changed behavior reviewable without checking out the branch. For visual or scene changes, attach labelled screenshots of every materially changed scene and include before/after views when they clarify the difference. For interaction, animation, or lifecycle behavior that a still image cannot prove, attach a short screen recording or a concise sequence of screenshots. Non-visual changes still require relevant command/test results. State the device or emulator and API level used for Android evidence, identify any scenario that was not verified, and redact account details, tokens, Firebase configuration, and other sensitive data from all evidence.
+After each commit, update the draft PR through `gh` with a commit walkthrough. Group files that contribute to the same behavior and explain them together rather than repeating the diff file by file. For every commit, record:
+
+1. The commit SHA/title and the behavior it changes.
+2. Why the change is needed and its significance to the player or system.
+3. A concise scenario, sequence, or Mermaid diagram when it materially clarifies the behavior.
+4. The changed files with precise GitHub diff links to representative lines.
+5. Verification results and the strongest available review evidence.
+
+A PR must also contain a clear overall changelog, material decisions/trade-offs, associated documentation updates, and any deferred or unverified scenario.
+
+Every PR, in every phase and for work outside the roadmap, must include evidence that makes the changed behavior reviewable without checking out the branch. Attach useful visual evidence whenever the implementation or fix has a visible or device-observable result. For visual or scene changes, attach labelled screenshots of every materially changed scene and include before/after views when they clarify the difference. For interaction, animation, or lifecycle behavior that a still image cannot prove, attach a short screen recording or a concise sequence of screenshots. Use `gh pr edit --attach` or `gh pr comment --attach` to upload images and videos as the draft evolves. Non-visual changes still require relevant command/test results; explain why visual evidence is not useful when omitted. State the device or emulator and API level used for Android evidence, identify any scenario that was not verified, and redact account details, tokens, Firebase configuration, and other sensitive data from all evidence.
 
 Use `.github/pull_request_template.md` when opening a PR.
 
