@@ -43,6 +43,7 @@ public class GameManager {
     private final Context context;
     private final GameListener gameListener;
     private boolean isPaused = false;
+    private volatile boolean closed;
     public interface GameListener {
         void onProcessAdded(Order order);
         void onProcessCompleted(Order order);
@@ -70,13 +71,14 @@ public class GameManager {
     }
 
     private boolean tickUpdate(long deltaTime) {
-        if (gameListener != null) {
+        if (!closed && gameListener != null) {
             gameListener.onTimerTick();
         }
         return true;
     }
 
     public void startGame() {
+        if (closed) return;
         Log.d(TAG, "Starting game");
         isGameOver = false;
         score = 0;
@@ -101,7 +103,7 @@ public class GameManager {
         Log.d(TAG, "Scheduling next process in " + spawnDelay + "ms");
 
         processSpawnRunnable = () -> {
-            if (!isGameOver & !isPaused) {
+            if (!closed && !isGameOver && !isPaused) {
                 generateNewProcess();
                 scheduleNextProcess();
             }
@@ -119,7 +121,7 @@ public class GameManager {
                 activeOrders.add(newOrder);
                 Log.d(TAG, "New process added directly: " + newOrder.getName());
 
-                if (gameListener != null) {
+                if (!closed && gameListener != null) {
                     gameListener.onProcessAdded(newOrder);
                 }
             }
@@ -134,7 +136,7 @@ public class GameManager {
         gameTickRunnable = new Runnable() {
             @Override
             public void run() {
-                if (!isGameOver && !isPaused) {
+                if (!closed && !isGameOver && !isPaused) {
                     updateProcesses();
 
                     // Schedule the next update
@@ -189,7 +191,7 @@ public class GameManager {
             pendingRemovals.add(order);
         }
 
-        if (gameListener != null) {
+        if (!closed && gameListener != null) {
             gameListener.onProcessDied(order);
             gameListener.onScoreChanged(score);
         }
@@ -201,6 +203,7 @@ public class GameManager {
     }
 
     public void setDeadProcessCount(int count) {
+        if (closed) return;
         this.deadProcessCount = count;
 
         if (deadProcessCount >= MAX_DEAD_PROCESSES && !isGameOver) {
@@ -218,6 +221,7 @@ public class GameManager {
     }
 
     public void completeProcess(String processId) {
+        if (closed) return;
         Order orderToComplete = null;
 
         synchronized (mutex) {
@@ -257,7 +261,7 @@ public class GameManager {
 
             Log.d(TAG, "Process completed: " + orderToComplete.getName() + ", New score: " + score);
 
-            if (gameListener != null) {
+            if (!closed && gameListener != null) {
                 gameListener.onProcessCompleted(orderToComplete);
                 gameListener.onScoreChanged(score);
             }
@@ -268,6 +272,7 @@ public class GameManager {
     }
 
     private void endGame() {
+        if (closed || isGameOver) return;
         Log.d(TAG, "Game over! Final score: " + score);
         isGameOver = true;
 
@@ -278,7 +283,7 @@ public class GameManager {
         // Save high score if applicable
         saveHighScore();
 
-        if (gameListener != null) {
+        if (!closed && gameListener != null) {
             gameListener.onGameOver(score);
         }
 
@@ -302,6 +307,7 @@ public class GameManager {
     }
 
     public void pauseGame() {
+        if (closed) return;
         Log.d(TAG, "Game paused");
         if (processSpawnRunnable != null) {
             mainHandler.removeCallbacks(processSpawnRunnable);
@@ -322,7 +328,7 @@ public class GameManager {
     }
 
     public void resumeGame() {
-        if (!isGameOver && isPaused) {
+        if (!closed && !isGameOver && isPaused) {
             Log.d(TAG, "Game resumed");
             elapsedTimer.resume();
             
@@ -340,9 +346,11 @@ public class GameManager {
     }
 
     public void stopGame() {
+        if (closed) return;
+        closed = true;
         Log.d(TAG, "Game stopped");
-        mainHandler.removeCallbacks(processSpawnRunnable);
-        gameTickHandler.removeCallbacks(gameTickRunnable);
+        if (processSpawnRunnable != null) mainHandler.removeCallbacks(processSpawnRunnable);
+        if (gameTickRunnable != null) gameTickHandler.removeCallbacks(gameTickRunnable);
     }
 
     public List<Order> getActiveProcesses() {
@@ -364,19 +372,23 @@ public class GameManager {
         return isGameOver;
     }
 
+    public boolean isClosed() { return closed; }
+
     public boolean isRunning() {
-        return !isPaused && !isGameOver;
+        return !closed && !isPaused && !isGameOver;
     }
 
     public void addProcessDirectly(Order order) {
+        if (closed) return;
         synchronized (mutex) {
             activeOrders.add(order);
         }
     }
 
     public void setScore(int newScore) {
+        if (closed) return;
         this.score = newScore;
-        if (gameListener != null) {
+        if (!closed && gameListener != null) {
             gameListener.onScoreChanged(newScore);
         }
     }

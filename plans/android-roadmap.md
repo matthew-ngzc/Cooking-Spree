@@ -47,9 +47,12 @@ Before a phase begins, complete this planning checklist in its file:
 - [ ] Outcome approved by the owner.
 - [ ] Scope and exclusions defined.
 - [ ] Bounded slices and dependencies defined.
+- [ ] PR delivery map defined: each PR has assigned slices, a base/dependency strategy, mergeability, and an explicit ready-for-review gate.
 - [ ] Acceptance criteria and verification defined.
 - [ ] Documentation owners identified.
 - [ ] Relevant ideas and ADRs linked; required material decisions recorded.
+
+A phase may use several PRs. Each PR becomes ready as soon as its assigned scope and evidence are complete; it does not wait for later PRs in the phase. Unless the delivery map identifies a blocker, implementation proceeds to the next PR while the owner reviews the previous one. Independent PRs target the normal integration branch. Dependent work uses a stacked PR whose base is the predecessor branch until that predecessor merges, then is retargeted or rebased so reviewers continue to see only the intended change. Owner review is required for every PR, and agents never merge them.
 
 Material architecture, persistence, online, platform, or product decisions use [decision records](../docs/decisions/README.md). Revisions preserve earlier detail by marking it deferred or superseded rather than silently removing commitments.
 
@@ -59,7 +62,7 @@ Sol/Terra plans and orchestrates; Luna implements bounded slices; the orchestrat
 
 Implementation means the planned changes have been made. Verification means the build, focused tests, review, and relevant device/emulator smoke checks demonstrate the phase's acceptance criteria. Missing device evidence leaves verification pending.
 
-A phase is complete only when its criteria are met, automated and manual evidence is recorded, documentation is current, and the owner approves its PR. Opening a PR does not authorize merging. Review the next phase's plan against the actual result before starting it.
+A phase is complete only when its criteria are met, automated and manual evidence is recorded, documentation is current, every PR in its delivery map has been approved and merged by the owner, and the owner approves the phase closeout. Opening or finalizing a PR does not authorize merging. Review the next phase's plan against the actual result before starting it.
 
 ## Supporting records and repository boundary
 

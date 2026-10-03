@@ -16,21 +16,22 @@ public class Pot extends Interactable {
     private final String TAG="pot";
     public enum State { EMPTY, COOKING, DONE }
     private final PotFunctions potFunctions;
-    private State state;
+    private volatile State state;
+    private volatile Bitmap currentPotSprite;
     private Bitmap emptySprite, cookingSprite, doneSprite;
     private final HashMap<String,Bitmap> ingredientSprites=new HashMap<>();
     //Shared pot thread pool
     private final PotThreadPool potThreadPool; //Should be initialized in GameActivity then passed from Game
-    private final Context context; //Should be GameActivity context from Game
+    private final PotFunctions.PotListener potListener;
     private final Object stateLock = new Object();
 
-    public Pot(Context context, float x, float y, JSONObject props,PotThreadPool potThreadPool) {
+    public Pot(Context context, float x, float y, JSONObject props,PotThreadPool potThreadPool, PotFunctions.PotListener potListener) {
         this.x = x;
         this.y = y;
         // preset cookingDuration, ms so 6 seconds
         int cookingDuration = 6000;
         this.potThreadPool=potThreadPool;
-        this.context=context; //Game Activity context
+        this.potListener=potListener;
         //Use preset cooking duration if props has no cooking_time set
         cookingDuration = props.optInt("cooking_time", cookingDuration);
         this.potFunctions=new PotFunctions(cookingDuration);
@@ -113,7 +114,8 @@ public class Pot extends Interactable {
                                 //Submit to the thread pool
                                 potThreadPool.submit(() -> {
                                     //Send to potFunctions, will update the CookedFood there
-                                    potFunctions.cookIngredients(recipeToCook,(GameActivity)context);
+                                    potFunctions.cookIngredients(recipeToCook,potListener);
+                                    if (Thread.currentThread().isInterrupted()) return;
 
                                     //When done set state to done and update sprite so player knows to collect food
                                     synchronized (stateLock) {
@@ -153,11 +155,12 @@ public class Pot extends Interactable {
 
     @Override
     public void draw(Canvas canvas, Paint paint, int TILE_SIZE) {
-        if (sprite == null) {
+        Bitmap drawSprite = currentPotSprite;
+        if (drawSprite == null) {
             Log.e("DrawDebug", "Missing sprite for " + getClass().getSimpleName());
             return;
         }
-        canvas.drawBitmap(Bitmap.createScaledBitmap(sprite, TILE_SIZE, TILE_SIZE, true), x, y, paint);
+        canvas.drawBitmap(Bitmap.createScaledBitmap(drawSprite, TILE_SIZE, TILE_SIZE, true), x, y, paint);
 
         //Draw all ingredients inside above the pot
         List<Ingredient> ingredients = potFunctions.getIngredientsInside();
@@ -193,12 +196,15 @@ public class Pot extends Interactable {
             switch (state) {
                 case EMPTY:
                     sprite = emptySprite;
+                    currentPotSprite = emptySprite;
                     break;
                 case COOKING:
                     sprite = cookingSprite;
+                    currentPotSprite = cookingSprite;
                     break;
                 case DONE:
                     sprite = doneSprite;
+                    currentPotSprite = doneSprite;
                     break;
             }
         }
