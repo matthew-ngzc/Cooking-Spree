@@ -4,14 +4,21 @@ Purpose: make structural changes to the Android app, custom game engine, map, re
 
 ## Runtime shape
 
-```text
-MainActivity ──> GameActivity / TutorialActivity
-                    │  choose layout, then compose one activity session
-                    ├─ GameManager ──> orders, timer ticks, score, game-over callbacks
-                    ├─ GameView ─────> one interruptible draw/update loop per surface
-                    └─ Game ─────────> map, Player, interactables, collision
-                                      ├─ Pots (session PotThreadPool)
-                                      └─ Baskets (BasketManager + fetcher-owned filler/queue)
+```mermaid
+flowchart TD
+    Main[MainActivity] --> Activity[GameActivity or TutorialActivity]
+    Activity -->|select layout, then compose once| Manager[GameManager]
+    Activity --> View[GameView]
+    Activity --> Game[Game]
+    Manager --> Orders[Orders, timer ticks, score, game-over callbacks]
+    View -->|one interruptible loop per surface| Render[Update and draw]
+    Game --> World[Map, player, interactables, collision]
+    Game --> Pots[Pots]
+    Pots --> PotPool[Session PotThreadPool]
+    Game --> Baskets[Baskets]
+    Baskets --> BasketManager[BasketManager]
+    BasketManager --> Fetcher[IngredientFetchWorker]
+    Fetcher -->|owns| Filler[Filler and queue]
 ```
 
 `GameActivity` selects the layout before composing its session. `TutorialActivity` overrides the layout choice, so the superclass composes directly against the tutorial layout and does not create a hidden game first. A one-shot composition guard protects manager, render binding, pot pool, and fetch/fill ownership. Android XML layouts are overlays around `GameView`; canvas objects are not Android views.
@@ -37,6 +44,25 @@ MainActivity ──> GameActivity / TutorialActivity
 | Session workers | Owning activity session | Activity close stops manager handlers, interrupts the pot pool and fetcher, and the fetcher closes its filler and queue. |
 
 ## Concurrency boundaries
+
+```mermaid
+sequenceDiagram
+    participant Android
+    participant Activity as GameActivity
+    participant Gate as Session callback gate
+    participant Manager as GameManager
+    participant Workers as Pot/fetch/fill workers
+    participant View as GameView render thread
+
+    Android->>Activity: onDestroy()
+    Activity->>Gate: close()
+    Note over Gate: Later and already-posted UI callbacks are discarded
+    Activity->>Manager: close and remove handlers
+    Activity->>Workers: close and interrupt waits/sleeps
+    Activity->>View: close, interrupt, bounded join
+    Workers-->>Activity: no late mutation or callback
+    View-->>Activity: render loop exits
+```
 
 `GameManager` handlers run on the main looper, while `PotThreadPool`, `IngredientFetchWorker`, and `IngredientBasketFiller` use executors. Closing an owner is idempotent, prevents later submissions, removes manager callbacks, and interrupts sleeps and queue waits. The fetcher owns and closes its filler; queue closure wakes both producer and consumer waiters. Interrupted cooking exits before producing food or reporting progress. The pot receives a narrow `PotFunctions.PotListener`, not an Activity cast.
 
