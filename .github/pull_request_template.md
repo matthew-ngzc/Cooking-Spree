@@ -6,6 +6,14 @@
 
 <!-- User problem, defect, or approved plan this addresses. -->
 
+## Plan scope and dependency
+
+- Plan/phase:
+- Slices assigned to this PR:
+- Base PR/branch and dependencies:
+- Independently mergeable: Yes / No — explain
+- Next planned PR:
+
 ## Decisions and trade-offs
 
 <!-- Material design/implementation choices; link ADRs where applicable. -->
@@ -61,7 +69,7 @@ Redact account details, tokens, Firebase configuration, and other sensitive data
 
 ## Ready-for-review gate
 
-- [ ] Every planned slice is complete.
+- [ ] Every slice assigned to this PR is complete.
 - [ ] Every commit has a walkthrough with file/line links and evidence.
 - [ ] Required automated and device/manual verification passed or is explicitly marked unavailable.
 - [ ] Useful screenshots/recordings are attached; omissions are explained.

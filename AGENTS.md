@@ -12,6 +12,10 @@ For implementation work, Terra and Sol are orchestrators: make a detailed, revie
 
 All maintained execution plans use GitHub-flavoured Markdown task checkboxes (`- [ ]` / `- [x]`) for actionable work, verification, gates, and owner approvals so progress can be updated in place. Add checkboxes when creating or refining a plan and update them as work is completed. Check an item only after its acceptance evidence exists; include or link that evidence near the item when practical. Checkboxes record progress but do not authorize unapproved work or promote inbox ideas. Only the product owner may check an owner-approval item.
 
+Before implementation, divide the plan into a **PR delivery map**. Prefer small, independently reviewable PRs rather than one phase-sized PR. For each PR, state its assigned slices, intended base and dependencies, whether it can merge independently, its verification/evidence requirements, and the exact gate for changing it from draft to ready for review. A PR is ready when every slice assigned to that PR is complete, its documentation and walkthroughs are current, and its required automated, manual, and visual evidence is present or explicitly unavailable; later slices elsewhere in the plan do not keep it in draft.
+
+After making one PR ready for review, continue with the next planned PR without waiting for owner review or merge unless the plan marks a real blocker. Real blockers include a required owner/product decision, an unavailable external prerequisite, a predecessor review outcome that could materially change the next scope, or work that cannot be isolated safely from an unmerged dependency. Start an independent next PR from its normal target branch. When the next PR depends on an unmerged predecessor, create a stacked branch from the predecessor and target the new PR at the predecessor branch so its diff contains only the new work. After the predecessor merges, retarget or rebase the dependent PR as appropriate. Keep prerequisite branches available until dependent PRs have been restacked. This continuation rule never authorizes the agent to merge a PR.
+
 For a small direct fix where delegation would cost more than it saves, state that judgment and proceed. Do not delegate a task whose safety or product decision still needs the user's answer.
 
 ## Product and platform direction
@@ -22,7 +26,7 @@ Read [docs/direction.md](docs/direction.md) before proposing product work and [p
 
 ## Change, commit, and PR contract
 
-Agents may commit and open pull requests. Use [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) for commit messages. Split implementation into small commits, each representing one coherent purpose. Open the PR as a draft when the first reviewable commit is available, keep it current throughout implementation, and convert it to ready for review only after the final planned slice, documentation, verification, and evidence are complete. The user reviews every PR and has final approval; opening or finalizing a PR never authorizes a merge.
+Agents may commit and open pull requests. Use [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) for commit messages. Split implementation into small commits, each representing one coherent purpose. Open each PR as a draft when its first reviewable commit is available, keep it current throughout its assigned slices, and convert it to ready for review when its own ready gate is satisfied. The user reviews every PR and has final approval; opening or finalizing a PR never authorizes a merge.
 
 After each commit, update the draft PR through `gh` with a commit walkthrough. Group files that contribute to the same behavior and explain them together rather than repeating the diff file by file. For every commit, record:
 
