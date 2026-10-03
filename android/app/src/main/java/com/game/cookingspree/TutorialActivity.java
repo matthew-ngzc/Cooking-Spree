@@ -19,9 +19,12 @@ public class TutorialActivity extends GameActivity {
 
     private int currentStep = 0;
     private List<TutorialStep> tutorialSteps;
+    private boolean tutorialComplete;
 
     @Override
     protected int getGameLayoutResource() { return R.layout.activity_tutorial; }
+
+    @Override protected boolean startsWithTutorialPause() { return true; }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,11 +56,6 @@ public class TutorialActivity extends GameActivity {
         // Start tutorial
         showCurrentStep();
 
-        // Pause the game initially
-        GameManager tutorialGameManager = getTutorialGameManager();
-        if (tutorialGameManager != null) {
-            tutorialGameManager.pauseGame();
-        }
     }
 
     // Helper method to access gameManager through game instance
@@ -134,26 +132,15 @@ public class TutorialActivity extends GameActivity {
     }
 
     private void handleSpecialSteps() {
-        GameManager tutorialGameManager = getTutorialGameManager();
-
         switch (currentStep) {
             case 1: // Movement step
-                // Resume game briefly to allow movement
-                if (tutorialGameManager != null) {
-                    tutorialGameManager.resumeGame();
-                }
+                pauseState.allowTutorialMovement(true);
                 break;
             case 2: // Orders step
-                // Ensure game is paused to focus on UI
-                if (tutorialGameManager != null) {
-                    tutorialGameManager.pauseGame();
-                }
+                pauseState.allowTutorialMovement(false);
                 break;
             default:
-                // Keep game paused for most steps
-                if (tutorialGameManager != null) {
-                    tutorialGameManager.pauseGame();
-                }
+                pauseState.allowTutorialMovement(false);
                 break;
         }
     }
@@ -168,13 +155,13 @@ public class TutorialActivity extends GameActivity {
     }
 
     private void completeTutorial() {
+        if (tutorialComplete) return;
+        tutorialComplete = true;
         tutorialOverlay.setVisibility(View.GONE);
-
-        // Resume the game
-        GameManager tutorialGameManager = getTutorialGameManager();
-        if (tutorialGameManager != null) {
-            tutorialGameManager.resumeGame();
-        }
+        pauseState.allowTutorialMovement(false);
+        gameManager.pauseForTutorial(false);
+        Button togglePauseButton = findViewById(R.id.togglePauseButton);
+        if (togglePauseButton != null) togglePauseButton.setVisibility(View.VISIBLE);
 
         // Optionally go back to main menu or continue playing
         // For now, let's continue in tutorial mode

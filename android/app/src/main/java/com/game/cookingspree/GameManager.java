@@ -9,6 +9,7 @@ import android.widget.Toast;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import android.os.SystemClock;
 
 public class GameManager {
     private static final String TAG = "GameManager";
@@ -43,6 +44,10 @@ public class GameManager {
     private final Context context;
     private final GameListener gameListener;
     private boolean isPaused = false;
+    private final PauseState pauseState;
+    private long nextSpawnAt;
+    private int remainingSpawnDelay;
+    private boolean remainingSpawnPending;
     private volatile boolean closed;
     public interface GameListener {
         void onProcessAdded(Order order);
@@ -54,6 +59,10 @@ public class GameManager {
     }
 
     public GameManager(Context context, GameListener listener,List<Recipe> recipeList) {
+        this(context, listener, recipeList, new PauseState());
+    }
+
+    public GameManager(Context context, GameListener listener,List<Recipe> recipeList, PauseState pauseState) {
         this.context = context;
         this.gameListener = listener;
         this.activeOrders = new ArrayList<>();
@@ -63,6 +72,7 @@ public class GameManager {
         this.deadProcessCount = 0;
         this.isGameOver = false;
         this.random = new Random();
+        this.pauseState = pauseState;
 
         this.timerStepper = new DeltaStepper(1000, this::tickUpdate);
 
@@ -90,20 +100,23 @@ public class GameManager {
             pendingRemovals.clear();
         }
 
-        // Start the process spawning logic
-        scheduleNextProcess();
-
-        // Start the game tick for updating timers
-        startGameTick();
+        isPaused = !pauseState.isRunning();
+        if (!isPaused) {
+            scheduleNextProcess();
+            startGameTick();
+        }
     }
 
     private void scheduleNextProcess() {
-        int spawnDelay = 5000 + random.nextInt(8000); // 5-13 seconds between processes
+        int spawnDelay = remainingSpawnPending ? remainingSpawnDelay : 5000 + random.nextInt(8000);
+        remainingSpawnDelay = 0;
+        remainingSpawnPending = false;
+        nextSpawnAt = SystemClock.elapsedRealtime() + spawnDelay;
 
         Log.d(TAG, "Scheduling next process in " + spawnDelay + "ms");
 
         processSpawnRunnable = () -> {
-            if (!closed && !isGameOver && !isPaused) {
+            if (!closed && !isGameOver && !isPaused && pauseState.isRunning()) {
                 generateNewProcess();
                 scheduleNextProcess();
             }
@@ -136,7 +149,7 @@ public class GameManager {
         gameTickRunnable = new Runnable() {
             @Override
             public void run() {
-                if (!closed && !isGameOver && !isPaused) {
+                if (!closed && !isGameOver && !isPaused && pauseState.isRunning()) {
                     updateProcesses();
 
                     // Schedule the next update
@@ -150,6 +163,7 @@ public class GameManager {
     }
 
     private void updateProcesses() {
+        if (!pauseState.isRunning() || isGameOver || closed) return;
         // Get elapsed time since last update
         long delta = elapsedTimer.progress();
 
@@ -221,7 +235,7 @@ public class GameManager {
     }
 
     public void completeProcess(String processId) {
-        if (closed) return;
+        if (closed || isGameOver || !pauseState.isRunning()) return;
         Order orderToComplete = null;
 
         synchronized (mutex) {
@@ -275,6 +289,7 @@ public class GameManager {
         if (closed || isGameOver) return;
         Log.d(TAG, "Game over! Final score: " + score);
         isGameOver = true;
+        pauseState.setTerminal();
 
         // Remove callbacks to prevent further updates
         mainHandler.removeCallbacks(processSpawnRunnable);
@@ -307,47 +322,47 @@ public class GameManager {
     }
 
     public void pauseGame() {
-        if (closed) return;
-        Log.d(TAG, "Game paused");
-        if (processSpawnRunnable != null) {
-            mainHandler.removeCallbacks(processSpawnRunnable);
-        }
-        if (gameTickRunnable != null) {
-            gameTickHandler.removeCallbacks(gameTickRunnable);
-        }
-        elapsedTimer.pause();
-
-        // Pause all active process timers
-        synchronized (mutex) {
-            for (Order order : activeOrders) {
-                order.pauseTimer();
-            }
-        }
-        
-        isPaused = true;
+        setPauseReason(PauseState.Reason.MANUAL_MENU, true);
     }
 
-    public void resumeGame() {
-        if (!closed && !isGameOver && isPaused) {
-            Log.d(TAG, "Game resumed");
-            elapsedTimer.resume();
-            
-            // Resume all active process timers
-            synchronized (mutex) {
-                for (Order order : activeOrders) {
-                    order.resumeTimer();
-                }
+    public void pauseForBackground() { setPauseReason(PauseState.Reason.BACKGROUND, true); }
+    public void resumeFromBackground() { setPauseReason(PauseState.Reason.BACKGROUND, false); }
+    public void pauseForTutorial(boolean paused) { setPauseReason(PauseState.Reason.TUTORIAL, paused); }
+
+    private void setPauseReason(PauseState.Reason reason, boolean paused) {
+        if (closed || isGameOver) return;
+        boolean wasRunning = pauseState.isRunning();
+        pauseState.setPaused(reason, paused);
+        boolean running = pauseState.isRunning();
+        if (wasRunning == running) return;
+        if (!running) {
+            isPaused = true;
+            if (processSpawnRunnable != null) {
+                remainingSpawnDelay = (int) Math.max(0L, nextSpawnAt - SystemClock.elapsedRealtime());
+                remainingSpawnPending = true;
+                mainHandler.removeCallbacks(processSpawnRunnable);
             }
-            
+            if (gameTickRunnable != null) gameTickHandler.removeCallbacks(gameTickRunnable);
+            elapsedTimer.pause();
+            synchronized (mutex) { for (Order order : activeOrders) order.pauseTimer(); }
+        } else {
+            isPaused = false;
+            elapsedTimer.resume();
+            synchronized (mutex) { for (Order order : activeOrders) order.resumeTimer(); }
             scheduleNextProcess();
             startGameTick();
-            isPaused = false;
         }
+    }
+
+    /* Compatibility entry point: explicit manual-menu resume only clears that reason. */
+    public void resumeGame() {
+        setPauseReason(PauseState.Reason.MANUAL_MENU, false);
     }
 
     public void stopGame() {
         if (closed) return;
         closed = true;
+        pauseState.close();
         Log.d(TAG, "Game stopped");
         if (processSpawnRunnable != null) mainHandler.removeCallbacks(processSpawnRunnable);
         if (gameTickRunnable != null) gameTickHandler.removeCallbacks(gameTickRunnable);
@@ -375,11 +390,14 @@ public class GameManager {
     public boolean isClosed() { return closed; }
 
     public boolean isRunning() {
-        return !closed && !isPaused && !isGameOver;
+        return !closed && !isPaused && !isGameOver && pauseState.isRunning();
     }
+
+    PauseState getPauseStateForTest() { return pauseState; }
 
     public void addProcessDirectly(Order order) {
         if (closed) return;
+        if (!pauseState.isRunning()) order.pauseTimer();
         synchronized (mutex) {
             activeOrders.add(order);
         }

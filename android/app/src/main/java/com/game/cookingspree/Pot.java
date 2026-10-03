@@ -24,17 +24,23 @@ public class Pot extends Interactable {
     private final PotThreadPool potThreadPool; //Should be initialized in GameActivity then passed from Game
     private final PotFunctions.PotListener potListener;
     private final Object stateLock = new Object();
+    private final PauseState pauseState;
 
     public Pot(Context context, float x, float y, JSONObject props,PotThreadPool potThreadPool, PotFunctions.PotListener potListener) {
+        this(context, x, y, props, potThreadPool, potListener, new PauseState());
+    }
+
+    public Pot(Context context, float x, float y, JSONObject props,PotThreadPool potThreadPool, PotFunctions.PotListener potListener, PauseState pauseState) {
         this.x = x;
         this.y = y;
         // preset cookingDuration, ms so 6 seconds
         int cookingDuration = 6000;
         this.potThreadPool=potThreadPool;
         this.potListener=potListener;
+        this.pauseState=pauseState;
         //Use preset cooking duration if props has no cooking_time set
         cookingDuration = props.optInt("cooking_time", cookingDuration);
-        this.potFunctions=new PotFunctions(cookingDuration);
+        this.potFunctions=new PotFunctions(cookingDuration,pauseState);
 
         try {
             //Default if not props state is State.EMPTY
@@ -118,10 +124,17 @@ public class Pot extends Interactable {
                                     if (Thread.currentThread().isInterrupted()) return;
 
                                     //When done set state to done and update sprite so player knows to collect food
-                                    synchronized (stateLock) {
-                                        state=State.DONE;
+                                    while (!pauseState.runIfRunning(() -> {
+                                        synchronized (stateLock) { state=State.DONE; }
+                                        updateSprite();
+                                    })) {
+                                        try {
+                                            if (!pauseState.awaitActiveDuration(0)) return;
+                                        } catch (InterruptedException e) {
+                                            Thread.currentThread().interrupt();
+                                            return;
+                                        }
                                     }
-                                    updateSprite();
                                 });
                             }
                         }

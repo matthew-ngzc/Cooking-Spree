@@ -24,6 +24,7 @@ public class IngredientFetchWorker {
     private final int maxCap;
     private final AtomicBoolean closed = new AtomicBoolean();
     private volatile boolean fetching;
+    private final PauseState pauseState;
 
 
     public interface ingredientFetchListener{
@@ -31,13 +32,18 @@ public class IngredientFetchWorker {
     }
 
     public IngredientFetchWorker(Integer maxCap,BasketManager basketManager){
+        this(maxCap, basketManager, new PauseState());
+    }
+
+    public IngredientFetchWorker(Integer maxCap,BasketManager basketManager, PauseState pauseState){
         // fill the available list
         Log.d(TAG, "Initializing ingredient list");
         generateIngredientList();
         this.maxCap=maxCap;
+        this.pauseState=pauseState;
         this.queue=new IngredientQueue(maxCap);
         this.random=new Random();
-        this.basketFiller=new IngredientBasketFiller(queue,basketManager,maxCap);
+        this.basketFiller=new IngredientBasketFiller(queue,basketManager,maxCap,pauseState);
     }
 
     private void generateIngredientList(){
@@ -107,6 +113,7 @@ public class IngredientFetchWorker {
             //Put all ingredients into the queue, will be taken from queue by basket filler
             for (Ingredient ingredient:usedList){
                 if (closed.get() || Thread.currentThread().isInterrupted()) return;
+                if (!pauseState.awaitActiveDuration(0)) return;
                 queue.put(ingredient);
             }
         }
@@ -137,37 +144,48 @@ public class IngredientFetchWorker {
         //In ms, currently 3 seconds
         int fetchTime = 3000;
         for (int i = 1; i<= fetchTime /1000; i++){
-                    if (closed.get()) return;
-                    Thread.sleep(1000);
-                    if (!closed.get() && listener != null) listener.fetchIngredientProgressUpdate(i);
+                    if (closed.get() || !pauseState.awaitActiveDuration(1000)) return;
+                    if (!deliverProgress(listener, i)) return;
         }
         if (closed.get()) return;
         Ingredient result = null;
         // get input ingredient from the available list
-        synchronized (availableLock) {
-            if (closed.get()) return;
-            //replace ingredient to fetch from inventory
-            if (usedList.contains(returnIngredient) && availableList.contains(ingredient)) {
-                int swapItemIndex=availableList.indexOf(ingredient);
-                Log.d(TAG,"Swap item is at index:"+swapItemIndex+" is ingredient"+ingredient.getName());
-                availableList.set(swapItemIndex,returnIngredient);
-
-                result = ingredient;
-                int returnItemIndex=usedList.indexOf(returnIngredient);
-                Log.d(TAG,"return item is at index:"+swapItemIndex+" is ingredient"+returnIngredient.getName());
-                usedList.set(returnItemIndex,result);
-            }
+        final Ingredient[] swapped = new Ingredient[1];
+        while (swapped[0] == null && !closed.get()) {
+            if (!pauseState.runIfRunning(() -> {
+                synchronized (availableLock) {
+                    if (closed.get()) return;
+                    if (usedList.contains(returnIngredient) && availableList.contains(ingredient)) {
+                        int swapItemIndex=availableList.indexOf(ingredient);
+                        availableList.set(swapItemIndex,returnIngredient);
+                        int returnItemIndex=usedList.indexOf(returnIngredient);
+                        usedList.set(returnItemIndex,ingredient);
+                        swapped[0]=ingredient;
+                    }
+                }
+            })) {
+                if (!pauseState.awaitActiveDuration(0)) return;
+            } else break;
         }
+        result = swapped[0];
         if (result != null) {
             Log.d(TAG,"Swapped "+returnIngredient.getName()+" for "+ingredient.getName());
         }else{
             Log.d(TAG,"Failed to swap  "+returnIngredient.getName());
         }
 
-        if (closed.get()) return;
-        if (listener != null) listener.fetchIngredientProgressUpdate(fetchTime /1000+1);
+        if (closed.get() || !deliverProgress(listener, fetchTime /1000+1)) return;
         Log.d(TAG,"Starting update Baskets");
         updateBaskets(listener);
+    }
+
+    private boolean deliverProgress(ingredientFetchListener listener, int progress) throws InterruptedException {
+        if (listener == null) return !closed.get();
+        while (!closed.get()) {
+            if (pauseState.runIfRunning(() -> listener.fetchIngredientProgressUpdate(progress))) return true;
+            if (!pauseState.awaitActiveDuration(0)) return false;
+        }
+        return false;
     }
 
     public void close() {
