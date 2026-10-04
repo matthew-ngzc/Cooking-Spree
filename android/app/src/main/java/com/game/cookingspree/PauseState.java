@@ -4,7 +4,7 @@ import java.util.EnumSet;
 
 /** Session pause reasons and an active-time wait used by gameplay workers. */
 public final class PauseState {
-    public enum Reason { MANUAL_MENU, BACKGROUND, TUTORIAL }
+    public enum Reason { MANUAL_MENU, BACKGROUND, TUTORIAL, LOAD }
 
     private final EnumSet<Reason> reasons = EnumSet.noneOf(Reason.class);
     private boolean terminal;

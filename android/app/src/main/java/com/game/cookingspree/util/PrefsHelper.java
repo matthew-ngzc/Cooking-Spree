@@ -7,6 +7,7 @@ import android.util.Log;
 import com.game.cookingspree.BaseActivity;
 
 import java.util.Map;
+import java.util.HashMap;
 
 public final class PrefsHelper {
     public interface SyncAdapter {
@@ -103,6 +104,33 @@ public final class PrefsHelper {
 
     public static void clearAll() { prefs.edit().clear().apply(); clearSaveState(); }
     public static void clearSaveState() { gameSavePrefs.edit().clear().apply(); }
+    public static synchronized boolean writeGameSaveValues(Map<String, ?> values) {
+        if (gameSavePrefs == null || values == null) return false;
+        for (Object value : values.values()) {
+            if (!(value instanceof String || value instanceof Integer || value instanceof Float
+                    || value instanceof Long || value instanceof Boolean)) return false;
+        }
+        Map<String, ?> previous = new HashMap<>(gameSavePrefs.getAll());
+        SharedPreferences.Editor editor = gameSavePrefs.edit().clear();
+        putValues(editor, values);
+        if (editor.commit()) return true;
+        SharedPreferences.Editor rollback = gameSavePrefs.edit().clear();
+        putValues(rollback, previous);
+        rollback.commit();
+        return false;
+    }
+
+    private static void putValues(SharedPreferences.Editor editor, Map<String, ?> values) {
+        for (Map.Entry<String, ?> entry : values.entrySet()) {
+            Object value = entry.getValue();
+            String key = entry.getKey();
+            if (value instanceof String) editor.putString(key, (String) value);
+            else if (value instanceof Integer) editor.putInt(key, (Integer) value);
+            else if (value instanceof Float) editor.putFloat(key, (Float) value);
+            else if (value instanceof Long) editor.putLong(key, (Long) value);
+            else if (value instanceof Boolean) editor.putBoolean(key, (Boolean) value);
+        }
+    }
     public static boolean hasSyncedThisSession() { return prefs.getBoolean("synced_once", false); }
     public static void setSyncedThisSession(boolean synced) { prefs.edit().putBoolean("synced_once", synced).apply(); }
     public static Map<String, ?> getAll() { return prefs.getAll(); }

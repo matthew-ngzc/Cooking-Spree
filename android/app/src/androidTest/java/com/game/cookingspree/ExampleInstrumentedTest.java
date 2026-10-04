@@ -2,6 +2,7 @@ package com.game.cookingspree;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.app.Activity;
 import android.os.SystemClock;
 import android.view.ViewGroup;
@@ -190,6 +191,222 @@ public class ExampleInstrumentedTest {
     }
 
     @Test
+    public void validAndRejectedLegacyLoadsAreIsolatedBeforeWorkersResume() {
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        Context appContext = instrumentation.getTargetContext();
+        SharedPreferences saves = appContext.getSharedPreferences("GameSave", Context.MODE_PRIVATE);
+        saves.edit().clear().commit();
+
+        GameActivity source = launchGame(instrumentation);
+        GameSaveSnapshot captured = instrumentationCall(instrumentation, source::captureSnapshotForTest);
+        GameSaveSnapshot valid = new GameSaveSnapshot(captured.playerX, captured.playerY, 321,
+                captured.deadProcessCount, captured.heldItem, captured.tableItems,
+                captured.orders, captured.pots);
+        finishAndAwaitClosed(instrumentation, source);
+        writeLegacyFixture(saves, valid.toLegacyValues());
+
+        GameActivity loaded = launchLoadGame(instrumentation);
+        assertTrue("valid candidate should load", loaded.loadSucceededForTest());
+        assertTrue("restore must happen while LOAD blocks new worker mutations",
+                loaded.restoreWasIsolatedForTest());
+        assertEquals(321, loaded.gameManager.getScore());
+        finishAndAwaitClosed(instrumentation, loaded);
+
+        GameActivity invalidSource = launchGame(instrumentation);
+        GameSaveSnapshot invalidCaptured = instrumentationCall(instrumentation,
+                invalidSource::captureSnapshotForTest);
+        java.util.Map<String, Object> invalidValues = new java.util.HashMap<>(invalidCaptured.toLegacyValues());
+        invalidValues.put("score", -1);
+        finishAndAwaitClosed(instrumentation, invalidSource);
+        writeLegacyFixture(saves, invalidValues);
+        java.util.Map<String, ?> persistedBeforeLoad = new java.util.HashMap<>(saves.getAll());
+
+        GameActivity rejected = launchLoadGame(instrumentation);
+        assertFalse("invalid candidate must be rejected", rejected.loadSucceededForTest());
+        assertEquals("rejected load must leave the fresh session unchanged", 0,
+                rejected.gameManager.getScore());
+        assertEquals("rejected save data must remain available for recovery",
+                persistedBeforeLoad, saves.getAll());
+        finishAndAwaitClosed(instrumentation, rejected);
+        saves.edit().clear().commit();
+    }
+
+    @Test
+    public void richLegacyRunRoundTripsPlayerTableOrderAndPartialPots() {
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        SharedPreferences saves = instrumentation.getTargetContext()
+                .getSharedPreferences("GameSave", Context.MODE_PRIVATE);
+        saves.edit().clear().commit();
+        GameActivity source = launchGame(instrumentation);
+        GameSaveSnapshot empty = instrumentationCall(instrumentation, source::captureSnapshotForTest);
+
+        java.util.List<GameSaveSnapshot.SavedItem> tables = new java.util.ArrayList<>(empty.tableItems);
+        assertFalse("map fixture needs at least one table", tables.isEmpty());
+        tables.set(0, new GameSaveSnapshot.SavedItem(PlayerInventory.COOKED, 5, "Tomato Soup",
+                java.util.Arrays.asList(4, 0, 2)));
+        java.util.List<GameSaveSnapshot.SavedPot> pots = java.util.Arrays.asList(
+                new GameSaveSnapshot.SavedPot(Pot.State.EMPTY, java.util.Collections.singletonList(1),
+                        null, 0, null, java.util.Collections.emptyList()),
+                new GameSaveSnapshot.SavedPot(Pot.State.EMPTY, java.util.Arrays.asList(4, 4),
+                        null, 0, null, java.util.Collections.emptyList()));
+        java.util.List<GameSaveSnapshot.SavedOrder> orders = java.util.Collections.singletonList(
+                new GameSaveSnapshot.SavedOrder("Tomato Soup", 47, 90));
+        GameSaveSnapshot rich = new GameSaveSnapshot(empty.playerX, empty.playerY, 321, 2,
+                new GameSaveSnapshot.SavedItem(PlayerInventory.INGREDIENT, 4, "tomato",
+                        java.util.Collections.emptyList()), tables, orders, pots);
+        finishAndAwaitClosed(instrumentation, source);
+        writeLegacyFixture(saves, rich.toLegacyValues());
+
+        GameActivity loaded = launchLoadGame(instrumentation);
+        assertTrue(loaded.loadSucceededForTest());
+        assertTrue(loaded.restoreWasIsolatedForTest());
+        assertEquals(321, loaded.gameManager.getScore());
+        assertEquals(2, loaded.gameManager.getDeadProcessCount());
+        assertEquals("tomato", loaded.game.getPlayer().getInventory().getHeld().getName());
+        assertEquals("Tomato Soup", loaded.game.getTables().get(0).getItemOnTable().getName());
+        assertEquals(1, loaded.gameManager.getActiveProcesses().size());
+        Order order = loaded.gameManager.getActiveProcesses().get(0);
+        assertEquals("Tomato Soup", order.getRecipe().getName());
+        assertEquals(90, order.getTimeLimit());
+        assertTrue(order.getTimeRemaining() <= 47 && order.getTimeRemaining() >= 46);
+        assertEquals(java.util.Arrays.asList(1), ingredientIds(loaded.game.getPots().get(0).getInPot()));
+        assertEquals(java.util.Arrays.asList(4, 4), ingredientIds(loaded.game.getPots().get(1).getInPot()));
+        finishAndAwaitClosed(instrumentation, loaded);
+        saves.edit().clear().commit();
+    }
+
+    @Test
+    public void nearCompleteCookingSurvivesLoadSaveReloadThenFinishesOnce() {
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        SharedPreferences saves = instrumentation.getTargetContext()
+                .getSharedPreferences("GameSave", Context.MODE_PRIVATE);
+        saves.edit().clear().commit();
+        GameActivity source = launchGame(instrumentation);
+        GameSaveSnapshot empty = instrumentationCall(instrumentation, source::captureSnapshotForTest);
+        GameSaveSnapshot.SavedPot cooking = new GameSaveSnapshot.SavedPot(Pot.State.COOKING,
+                java.util.Arrays.asList(4, 0, 2), null, 5, "Tomato Soup",
+                java.util.Arrays.asList(4, 0, 2));
+        GameSaveSnapshot fixture = new GameSaveSnapshot(empty.playerX, empty.playerY, 25, 1,
+                empty.heldItem, empty.tableItems, empty.orders,
+                java.util.Arrays.asList(cooking, empty.pots.get(1)));
+        finishAndAwaitClosed(instrumentation, source);
+        writeLegacyFixture(saves, fixture.toLegacyValues());
+
+        GameActivity firstLoad = launchLoadGame(instrumentation, true);
+        assertTrue(firstLoad.loadSucceededForTest());
+        Pot firstPot = firstLoad.game.getPots().get(0);
+        assertEquals(Pot.State.COOKING.name(), firstPot.getState());
+        assertEquals("Tomato Soup", firstPot.getPotFunctions().getRecipeCooking().getName());
+        assertEquals(5, firstPot.getPotFunctions().getCookProgress());
+        assertTrue(firstLoad.saveGameStateForTest());
+        assertEquals(5, saves.getInt("pot_0_cooking_progress", -1));
+        assertEquals("Tomato Soup", saves.getString("pot_0_recipe_name", null));
+        finishAndAwaitClosed(instrumentation, firstLoad);
+
+        GameActivity secondLoad = launchLoadGame(instrumentation, true);
+        assertTrue(secondLoad.loadSucceededForTest());
+        Pot resumedPot = secondLoad.game.getPots().get(0);
+        assertEquals(5, resumedPot.getPotFunctions().getCookProgress());
+        assertEquals("Tomato Soup", resumedPot.getPotFunctions().getRecipeCooking().getName());
+        instrumentation.runOnMainSync(secondLoad.gameManager::resumeGame);
+        await(() -> Pot.State.DONE.name().equals(resumedPot.getState())
+                        && resumedPot.getPotFunctions().gotFood(),
+                3_000, "near-complete restored cooking did not finish after resume");
+        CookedFood collected = resumedPot.getFood();
+        assertEquals("Tomato Soup", collected.getName());
+        assertNull("finished food should be collectible only once", resumedPot.getFood());
+        finishAndAwaitClosed(instrumentation, secondLoad);
+        saves.edit().clear().commit();
+    }
+
+    @Test
+    public void failedSnapshotPreservesPriorSaveAndLoadedTerminalRunClearsIt() {
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        SharedPreferences saves = instrumentation.getTargetContext()
+                .getSharedPreferences("GameSave", Context.MODE_PRIVATE);
+        saves.edit().clear().commit();
+        GameActivity activity = launchGame(instrumentation);
+        GameSaveSnapshot valid = instrumentationCall(instrumentation, activity::captureSnapshotForTest);
+        writeLegacyFixture(saves, valid.toLegacyValues());
+        java.util.Map<String, ?> beforeFailedSave = new java.util.HashMap<>(saves.getAll());
+        Pot inconsistent = activity.game.getPots().get(0);
+        instrumentation.runOnMainSync(() -> {
+            activity.gameManager.pauseGame();
+            inconsistent.setState(Pot.State.DONE.name()); // No food: snapshot must reject this live state.
+            assertFalse("inconsistent live capture should fail", activity.saveGameStateForTest());
+        });
+        assertEquals(beforeFailedSave, saves.getAll());
+        finishAndAwaitClosed(instrumentation, activity);
+
+        GameActivity loadSource = launchGame(instrumentation);
+        GameSaveSnapshot candidate = instrumentationCall(instrumentation, loadSource::captureSnapshotForTest);
+        finishAndAwaitClosed(instrumentation, loadSource);
+        writeLegacyFixture(saves, candidate.toLegacyValues());
+        GameActivity loaded = launchLoadGame(instrumentation);
+        assertTrue(loaded.loadSucceededForTest());
+        instrumentation.runOnMainSync(() -> loaded.gameManager.setDeadProcessCount(3));
+        await(() -> saves.getAll().isEmpty(), 2_000, "loaded game over should clear GameSave");
+        assertTrue("later load must have no candidate", saves.getAll().isEmpty());
+        finishAndAwaitClosed(instrumentation, loaded);
+    }
+
+    @Test
+    public void repeatedDonePotSnapshotsDoNotConsumeFood() {
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        Context appContext = instrumentation.getTargetContext();
+        SharedPreferences saves = appContext.getSharedPreferences("GameSave", Context.MODE_PRIVATE);
+        saves.edit().clear().commit();
+        GameActivity activity = launchGame(instrumentation);
+        Recipe recipe = Recipe.getDefaultRecipes().get(0);
+        Pot pot = activity.game.getPots().get(0);
+        instrumentation.runOnMainSync(() -> {
+            activity.gameManager.pauseGame();
+            pot.getPotFunctions().setCookedFood(new CookedFood(5, recipe.getName(), recipe.getIngredients()));
+            pot.setState(Pot.State.DONE.name());
+            assertTrue(activity.saveGameStateForTest());
+            assertTrue(activity.saveGameStateForTest());
+        });
+        assertEquals(Pot.State.DONE.name(), pot.getState());
+        assertNotNull("saved food remains collectible", pot.getFood());
+        assertNull("food is collected only once", pot.getFood());
+        finishAndAwaitClosed(instrumentation, activity);
+        saves.edit().clear().commit();
+    }
+
+    private static GameActivity launchLoadGame(android.app.Instrumentation instrumentation) {
+        return launchLoadGame(instrumentation, false);
+    }
+
+    private static GameActivity launchLoadGame(android.app.Instrumentation instrumentation,
+                                                boolean pauseAfterLoadForTest) {
+        Intent intent = new Intent(instrumentation.getTargetContext(), GameActivity.class)
+                .putExtra("loadSavedGame", true)
+                .putExtra("pauseAfterLoadForTest", pauseAfterLoadForTest)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        Activity launched = instrumentation.startActivitySync(intent);
+        assertTrue(launched instanceof GameActivity);
+        return (GameActivity) launched;
+    }
+
+    private static void writeLegacyFixture(SharedPreferences preferences, java.util.Map<String, ?> values) {
+        SharedPreferences.Editor editor = preferences.edit().clear();
+        for (java.util.Map.Entry<String, ?> entry : values.entrySet()) {
+            Object value = entry.getValue();
+            if (value instanceof Integer) editor.putInt(entry.getKey(), (Integer) value);
+            else if (value instanceof Float) editor.putFloat(entry.getKey(), (Float) value);
+            else if (value instanceof String) editor.putString(entry.getKey(), (String) value);
+            else throw new AssertionError("Unsupported fixture type " + value.getClass());
+        }
+        assertTrue("fixture write should complete", editor.commit());
+    }
+
+    private static java.util.List<Integer> ingredientIds(java.util.List<Ingredient> ingredients) {
+        java.util.List<Integer> ids = new java.util.ArrayList<>();
+        for (Ingredient ingredient : ingredients) ids.add(ingredient.getId());
+        return ids;
+    }
+
+    @Test
     public void repeatedActualSurfaceDetachAndAttachKeepsOneRenderLoopAndBoundedExit() {
         android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         GameActivity activity = launchGame(instrumentation);
@@ -254,9 +471,9 @@ public class ExampleInstrumentedTest {
         return result;
     }
 
-    private static Pot instrumentationCall(android.app.Instrumentation instrumentation,
-                                            java.util.concurrent.Callable<Pot> action) {
-        java.util.concurrent.atomic.AtomicReference<Pot> result = new java.util.concurrent.atomic.AtomicReference<>();
+    private static <T> T instrumentationCall(android.app.Instrumentation instrumentation,
+                                               java.util.concurrent.Callable<T> action) {
+        java.util.concurrent.atomic.AtomicReference<T> result = new java.util.concurrent.atomic.AtomicReference<>();
         instrumentation.runOnMainSync(() -> {
             try { result.set(action.call()); }
             catch (Exception e) { throw new AssertionError(e); }

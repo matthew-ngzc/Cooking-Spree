@@ -295,6 +295,15 @@ public Game(GameView gameView, Context context, PlayerInventory playerInventory,
         return true; // no collision
     }
 
+    boolean isTraversableTile(int tileX, int tileY) {
+        return tileLayer != null && tileX >= 0 && tileX < mapWidth && tileY >= 0 && tileY < mapHeight
+                && tileLayer[tileY][tileX] != 0
+                && canMoveTo(tileX * TILE_SIZE, tileY * TILE_SIZE);
+    }
+
+    int getMapWidth() { return mapWidth; }
+    int getMapHeight() { return mapHeight; }
+
     public List<Table> getTables() {
         List<Table> tableList = new ArrayList<>();
 

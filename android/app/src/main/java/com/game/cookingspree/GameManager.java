@@ -328,6 +328,7 @@ public class GameManager {
     public void pauseForBackground() { setPauseReason(PauseState.Reason.BACKGROUND, true); }
     public void resumeFromBackground() { setPauseReason(PauseState.Reason.BACKGROUND, false); }
     public void pauseForTutorial(boolean paused) { setPauseReason(PauseState.Reason.TUTORIAL, paused); }
+    public void setLoading(boolean loading) { setPauseReason(PauseState.Reason.LOAD, loading); }
 
     private void setPauseReason(PauseState.Reason reason, boolean paused) {
         if (closed || isGameOver) return;

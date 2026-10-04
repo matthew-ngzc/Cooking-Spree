@@ -5,7 +5,6 @@ import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.media.MediaPlayer;
 import android.media.PlaybackParams;
 import android.os.Bundle;
@@ -67,6 +66,8 @@ public class GameActivity extends BaseActivity implements
     private ImageView playerInventoryView;
     //private SharedPreferences sharedPreferences;
     private BasketManager basketManager;
+    private boolean loadSucceededForTest;
+    private boolean restoreWasIsolatedForTest;
 
     protected int getGameLayoutResource() { return R.layout.activity_game; }
 
@@ -137,8 +138,8 @@ public class GameActivity extends BaseActivity implements
             pauseMenu.setVisibility(gameManager.isRunning() ? View.GONE : View.VISIBLE);
         });
         save.setOnClickListener(v -> {
-            saveGameState();
-            Toast.makeText(this, "Game saved", Toast.LENGTH_SHORT).show();
+            boolean saved = saveGameState();
+            Toast.makeText(this, saved ? "Game saved" : "Unable to save game", Toast.LENGTH_SHORT).show();
         });
         settings.setOnClickListener(v -> {
             settingsMenu.setVisibility(View.VISIBLE);
@@ -158,385 +159,109 @@ public class GameActivity extends BaseActivity implements
         });
     }
 
-    private void saveGameState() {
+    private boolean saveGameState() {
         try {
-            // Get SharedPreferences and create an editor
-            SharedPreferences prefs = getSharedPreferences("GameSave", MODE_PRIVATE);
-            SharedPreferences.Editor editor = prefs.edit();
-
-            // Save player position
-            Player player = game.getPlayer();
-            editor.putFloat("playerX", player.getX());
-            editor.putFloat("playerY", player.getY());
-
-            // Save score and progress
-            int score = gameManager.getScore();
-            int deadProcessCount = gameManager.getDeadProcessCount();
-            editor.putInt("score", score);
-            editor.putInt("deadProcessCount", deadProcessCount);
-
-            // Save player inventory
-            FoodItem heldItem = playerInventory.getHeld();
-            if (heldItem != null) {
-                int itemType = playerInventory.checkHeldType();
-                editor.putInt("heldItemType", itemType);
-                editor.putInt("heldItemId", heldItem.getId());
-                editor.putString("heldItemName", heldItem.getName());
-
-                // For cooked food, save ingredients
-                if (itemType == PlayerInventory.COOKED && heldItem instanceof CookedFood) {
-                    CookedFood cookedFood = (CookedFood) heldItem;
-                    List<Ingredient> ingredients = cookedFood.getMadeWith();
-
-                    if (ingredients != null && !ingredients.isEmpty()) {
-                        editor.putInt("heldItemIngredientsCount", ingredients.size());
-
-                        for (int i = 0; i < ingredients.size(); i++) {
-                            Ingredient ingredient = ingredients.get(i);
-                            editor.putInt("heldItemIngredient_" + i + "_id", ingredient.getId());
-                            editor.putString("heldItemIngredient_" + i + "_name", ingredient.getName());
-                        }
-                    }
-                }
-            } else {
-                editor.putInt("heldItemType", PlayerInventory.EMPTY);
-            }
-
-            // Save Table items
-            List<Table> tables = game.getTables();
-            editor.putInt("tableCount", tables.size());
-
-            for (int i = 0; i < tables.size(); i++) {
-                Table table = tables.get(i);
-                FoodItem itemOnTable = table.getItemOnTable();
-
-                if (itemOnTable != null) {
-                    int itemType = (itemOnTable instanceof Ingredient) ?
-                            PlayerInventory.INGREDIENT : PlayerInventory.COOKED;
-                    editor.putInt("table_" + i + "_itemType", itemType);
-                    editor.putInt("table_" + i + "_itemId", itemOnTable.getId());
-                    editor.putString("table_" + i + "_itemName", itemOnTable.getName());
-
-                    // For cooked food, save ingredients
-                    if (itemType == PlayerInventory.COOKED && itemOnTable instanceof CookedFood) {
-                        CookedFood cookedFood = (CookedFood) itemOnTable;
-                        List<Ingredient> ingredients = cookedFood.getMadeWith();
-
-                        if (ingredients != null && !ingredients.isEmpty()) {
-                            editor.putInt("table_" + i + "_ingredientsCount", ingredients.size());
-
-                            for (int j = 0; j < ingredients.size(); j++) {
-                                Ingredient ingredient = ingredients.get(j);
-                                editor.putInt("table_" + i + "_ingredient_" + j + "_id", ingredient.getId());
-                                editor.putString("table_" + i + "_ingredient_" + j + "_name", ingredient.getName());
-                            }
-                        }
-                    }
-                } else {
-                    editor.putInt("table_" + i + "_itemType", -1);  // -1 indicates empty table
-                }
-            }
-
-            // Save Process information
-            List<Order> activeOrders = gameManager.getActiveProcesses();
-            List<Order> relevantOrders = new ArrayList<>();
-
-            // Only save processes that aren't complete or dead
-            for (Order order : activeOrders) {
-                if (!order.isComplete() && !order.isDead()) {
-                    relevantOrders.add(order);
-                }
-            }
-
-            editor.putInt("processCount", relevantOrders.size());
-
-            // Save each process
-            for (int i = 0; i < relevantOrders.size(); i++) {
-                Order order = relevantOrders.get(i);
-                editor.putString("process_" + i + "_recipe", order.getRecipe().getName());
-                editor.putInt("process_" + i + "_remaining", order.getTimeRemaining());
-                editor.putInt("process_" + i + "_limit", order.getTimeLimit());
-            }
-
-            // Save pots
-            List<Pot> pots = game.getPots();
-            editor.putInt("potCount", pots.size());
-
-            for (int i = 0; i < pots.size(); i++) {
-                Pot pot = pots.get(i);
-
-                // Save common pot info for all pot states
-                editor.putString("pot_" + i + "_state", pot.getState());
-
-                List<Ingredient> ingredients = pot.getInPot();
-                editor.putInt("pot_" + i + "_ingredientCount", ingredients.size());
-
-                //Save the ingredients
-                for (int j = 0; j < ingredients.size(); j++) {
-                    Ingredient ingredient = ingredients.get(j);
-                    editor.putInt("pot_" + i + "_ingredient_" + j + "_id", ingredient.getId());
-                }
-
-                // If pot is DONE state, save cooked food
-                if (pot.getState().equals(Pot.State.DONE.name())) {
-                    CookedFood food = pot.getFood();
-                    editor.putInt("pot_" + i + "_food_id", food.getId());
-                    editor.putString("pot_" + i + "_food_name", food.getName());
-
-                    List<Ingredient> madeWith = food.getMadeWith();
-                    editor.putInt("pot_" + i + "_food_ingredientCount", madeWith.size());
-
-                    for (int j = 0; j < madeWith.size(); j++) {
-                        Ingredient ingredient = madeWith.get(j);
-                        editor.putInt("pot_" + i + "_food_ingredient_" + j + "_id", ingredient.getId());
-                    }
-                }
-
-                // If pot is in COOKING state, save cooking progress and recipe being cooked as well
-                if (pot.getState().equals(Pot.State.COOKING.name())) {
-                    editor.putInt("pot_" + i + "_cooking_progress", pot.getPotFunctions().getCookProgress());
-                    Recipe beingCooked=pot.getPotFunctions().getRecipeCooking();
-                    editor.putString("pot_" + i + "_recipe_name", beingCooked.getName());
-
-                    List<Ingredient> ingredientList=beingCooked.getIngredients();
-
-                    editor.putInt("pot_" + i + "_recipe_ingredientCount", ingredientList.size());
-
-                    for (int j = 0; j < ingredientList.size(); j++) {
-                        Ingredient ingredient = ingredientList.get(j);
-                        editor.putInt("pot_" + i + "_recipe_ingredient_" + j + "_id", ingredient.getId());
-                    }
-                }
-            }
-
-            // Apply all changes
-            editor.apply();
-
-            Toast.makeText(this, "Game saved!", Toast.LENGTH_SHORT).show();
+            if (gameManager == null || gameManager.isGameOver()
+                    || !pauseState.isPaused(PauseState.Reason.MANUAL_MENU)) return false;
+            GameSaveSnapshot snapshot = GameSaveSnapshot.capture(game, gameManager, playerInventory);
+            GameSaveParser.parse(snapshot.toLegacyValues(), game.getTables().size(), game.getPots().size(),
+                    game.getMapWidth(), game.getMapHeight(), game.getPots().get(0).getPotFunctions().getMaximumProgressTicks(),
+                    game::isTraversableTile);
+            return PrefsHelper.writeGameSaveValues(snapshot.toLegacyValues());
         } catch (Exception e) {
-            Log.e("GameActivity", "Error saving game: " + e.getMessage());
-            Toast.makeText(this, "Error saving game", Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Error saving game snapshot", e);
+            return false;
         }
     }
 
     private void loadGameState() {
+        boolean loaded = false;
+        List<String> basketContentsBeforeRestore = basketManager.getContentsSnapshotForTest();
         try {
-            //Get load save
-            SharedPreferences prefs = getSharedPreferences("GameSave", MODE_PRIVATE);
-            // Load player position
-            float playerX = prefs.getFloat("playerX", 0);
-            float playerY = prefs.getFloat("playerY", 0);
-            game.getPlayer().setPosition(playerX, playerY);
+            GameSaveSnapshot candidate = GameSaveParser.parse(
+                    getSharedPreferences("GameSave", MODE_PRIVATE).getAll(), game.getTables().size(),
+                    game.getPots().size(), game.getMapWidth(), game.getMapHeight(),
+                    game.getPots().get(0).getPotFunctions().getMaximumProgressTicks(), game::isTraversableTile);
 
-            //load dead process count
-            int deadProcessCount = prefs.getInt("deadProcessCount", 0);
-            gameManager.setDeadProcessCount(deadProcessCount);
-
-            //Load score
-            int score = prefs.getInt("score", 0);
-            gameManager.setScore(score);
-
-            //Update UI
-            updateScoreDisplay(score);
-            updateDeadProcessCountDisplay(deadProcessCount);
-
-            //Clear player inventory
+            // No live state is touched until the entire legacy record has passed validation.
+            game.getPlayer().setPosition(candidate.playerX, candidate.playerY);
+            gameManager.setScore(candidate.score);
+            gameManager.setDeadProcessCount(candidate.deadProcessCount);
             playerInventory.getAndRemoveItem();
+            if (candidate.heldItem != null) playerInventory.grabItem(createSavedItem(candidate.heldItem));
 
-            // Load Player Inventory
-            int heldItemType = prefs.getInt("heldItemType", PlayerInventory.EMPTY);
-            if (heldItemType != PlayerInventory.EMPTY) {
-                int itemId = prefs.getInt("heldItemId", 0);
-                String itemName = prefs.getString("heldItemName", "");
-
-                FoodItem itemToHold = null;
-
-                if (heldItemType == PlayerInventory.INGREDIENT) {
-                    // Create ingredient using saved id
-                    itemToHold = new Ingredient(itemId);
-                }
-                else if (heldItemType == PlayerInventory.COOKED) {
-                    // Get ingredients for cooked food
-                    int ingredientsCount = prefs.getInt("heldItemIngredientsCount", 0);
-                    List<Ingredient> ingredients = new ArrayList<>();
-
-                    for (int i = 0; i < ingredientsCount; i++) {
-                        int ingId = prefs.getInt("heldItemIngredient_" + i + "_id", 0);
-                        Ingredient ingredient = new Ingredient(ingId);
-                        ingredients.add(ingredient);
-                    }
-
-                    // Create cooked food
-                    itemToHold = new CookedFood(itemId, itemName, ingredients);
-                }
-
-                // If valid item was created, add to inventory
-                if (itemToHold != null) {
-                    playerInventory.grabItem(itemToHold);
-                }
-            }
-
-            // Restore items on tables
-            int tableCount = prefs.getInt("tableCount", 0);
             List<Table> tables = game.getTables();
-
-            for (int i = 0; i < Math.min(tableCount, tables.size()); i++) {
-                Table table = tables.get(i);
-                int itemType = prefs.getInt("table_" + i + "_itemType", -1);
-
-                table.clearItem();
-
-                if (itemType != -1) {  // -1 means table was empty
-                    int itemId = prefs.getInt("table_" + i + "_itemId", 0);
-                    String itemName = prefs.getString("table_" + i + "_itemName", "");
-
-                    FoodItem itemToPlace = null;
-
-                    if (itemType == PlayerInventory.INGREDIENT) {
-                        // Create a simple ingredient
-                        itemToPlace = new Ingredient(itemId);
-                    }
-                    else if (itemType == PlayerInventory.COOKED) {
-                        // Get ingredients for cooked food
-                        int ingredientsCount = prefs.getInt("table_" + i + "_ingredientsCount", 0);
-                        List<Ingredient> ingredients = new ArrayList<>();
-
-                        for (int j = 0; j < ingredientsCount; j++) {
-                            int ingId = prefs.getInt("table_" + i + "_ingredient_" + j + "_id", 0);
-                            Ingredient ingredient = new Ingredient(ingId);
-                            ingredients.add(ingredient);
-                        }
-
-                        // Create cooked food
-                        itemToPlace = new CookedFood(itemId, itemName, ingredients);
-                    }
-
-                    // Place item on table
-                    if (itemToPlace != null) {
-                        table.placeItem(itemToPlace);  // Add this method to Table.java
-                    }
-                }
+            for (int i = 0; i < tables.size(); i++) {
+                GameSaveSnapshot.SavedItem item = candidate.tableItems.get(i);
+                tables.get(i).clearItem();
+                if (item != null) tables.get(i).placeItem(createSavedItem(item));
             }
-
-            // Make sure the player inventory view is updated in UI
-            updatePlayerInventoryView();
-
-            // Load processes
-            int processCount = prefs.getInt("processCount", 0);
-            List<Recipe> recipes = Recipe.getDefaultRecipes();
-
-            for (int i = 0; i < processCount; i++) {
-                String recipeName = prefs.getString("process_" + i + "_recipe", "");
-                int timeRemaining = prefs.getInt("process_" + i + "_remaining", 30);
-                int timeLimit = prefs.getInt("process_" + i + "_limit", 60);
-
-                // Find matching recipe
-                for (Recipe recipe : recipes) {
-                    if (recipe.getName().equals(recipeName)) {
-                        // Create a new process with this data
-                        Order order = Order.generateRandomOrder(recipe, timeLimit, timeRemaining);
-                        gameManager.addProcessDirectly(order);
-                        break;
-                    }
-                }
+            for (GameSaveSnapshot.SavedOrder saved : candidate.orders) {
+                gameManager.addProcessDirectly(Order.generateRandomOrder(findRecipe(saved.recipeName),
+                        saved.limitSeconds, saved.remainingSeconds));
             }
-
-            //Load pots
-            int potCount = prefs.getInt("potCount", 0);
             List<Pot> pots = game.getPots();
+            for (int i = 0; i < pots.size(); i++) pots.get(i).restoreForLoad(candidate.pots.get(i));
 
-            for (int i = 0; i < Math.min(potCount, pots.size()); i++) {
+            // All restored cooking state is installed before any resumed worker is submitted.
+            for (int i = 0; i < pots.size(); i++) {
+                GameSaveSnapshot.SavedPot saved = candidate.pots.get(i);
+                if (saved.state != Pot.State.COOKING) continue;
                 Pot pot = pots.get(i);
-
-                // Load pot state, or get default of EMPTY
-                String potState = prefs.getString("pot_" + i + "_state", Pot.State.EMPTY.name());
-                Log.d(TAG,"potState:"+potState);
-                pot.setState(potState);
-
-                // Load ingredients in the pot
-                int ingredientCount = prefs.getInt("pot_" + i + "_ingredientCount", 0);
-                List<Ingredient> ingredients = new ArrayList<>();
-
-                for (int j = 0; j < ingredientCount; j++) {
-                    int ingId = prefs.getInt("pot_" + i + "_ingredient_" + j + "_id", 0);
-                    Ingredient ingredient = new Ingredient(ingId);
-                    ingredients.add(ingredient);
-                }
-
-                // Add ingredients to pot
-                PotFunctions potFunctions = pot.getPotFunctions();
-                for (Ingredient ingredient : ingredients) {
-                    potFunctions.addIngredient(ingredient);
-                }
-
-                // If pot is in DONE state, load the cooked food
-                if (Pot.State.valueOf(potState)==Pot.State.DONE) {
-                    Log.d(TAG,"Loading DONE pot");
-                    //Cooked food is always id of 5
-                    int foodId = prefs.getInt("pot_" + i + "_food_id", 5);
-                    String foodName = prefs.getString("pot_" + i + "_food_name", "");
-
-                    int foodIngCount = prefs.getInt("pot_" + i + "_food_ingredientCount", 0);
-                    List<Ingredient> foodIngredients = new ArrayList<>();
-
-                    for (int j = 0; j < foodIngCount; j++) {
-                        int ingId = prefs.getInt("pot_" + i + "_food_ingredient_" + j + "_id", 0);
-                        Ingredient ingredient = new Ingredient(ingId);
-                        foodIngredients.add(ingredient);
-                    }
-
-                    // Create the cooked food and set it in the pot
-                    CookedFood cookedFood = new CookedFood(foodId, foodName, foodIngredients);
-                    potFunctions.setCookedFood(cookedFood);
-                }
-                // If pot is in COOKING state, restore cooking progress
-                else if (Pot.State.valueOf(potState)==Pot.State.COOKING) {
-                    int cookProgress = prefs.getInt("pot_" + i + "_cooking_progress", 0);
-                    String recipeName = prefs.getString("pot_" + i + "_recipe_name", "");
-
-                    // Find the recipe that's being cooked from default recipes
-                    Recipe cookingRecipe = null;
-                    for (Recipe recipe : Recipe.getDefaultRecipes()) {
-                        if (recipe.getName().equals(recipeName)) {
-                            cookingRecipe = recipe;
-                            break;
+                Recipe recipe = findRecipe(saved.recipeName);
+                if (recipe == null) recipe = new Recipe("Waste", new ArrayList<>());
+                final Recipe resumeRecipe = recipe;
+                potThreadPool.submit(() -> {
+                    pot.getPotFunctions().restartCooking(resumeRecipe, this);
+                    if (Thread.currentThread().isInterrupted() || !sessionCallbacks.isOpen()) return;
+                    try {
+                        while (!pauseState.runIfRunning(() -> pot.setState(Pot.State.DONE.name()))) {
+                            if (!pauseState.awaitActiveDuration(0)) return;
                         }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
                     }
-                    if (cookingRecipe==null){
-                        cookingRecipe=new Recipe("Waste",new ArrayList<>());
-                    }
-
-                    Log.d(TAG,"Restart cooking recipe");
-                    // put pot in cooking state
-                    pot.setState(Pot.State.COOKING.name());
-
-                    //Set cooking progress and recipe
-                    potFunctions.setCookProgress(cookProgress);
-                    final Recipe resumeRecipe=cookingRecipe;
-
-                    // Restart cooking using cookRecipe and progress
-                    potThreadPool.submit(() -> {
-                        potFunctions.restartCooking(resumeRecipe, this);
-                        if (Thread.currentThread().isInterrupted() || !sessionCallbacks.isOpen()) return;
-                        //Set pot state
-                        pot.setState(Pot.State.DONE.name());
-                        Log.d(TAG,"Finished cooking recipe");
-                    });
-
-                }
+                });
             }
 
-            if (orderAdapter != null) {
-                orderAdapter.updateProcesses(gameManager.getActiveProcesses());
-            }
-
-            updateMediaPlaybackSpeed(deadProcessCount);
-
-            Toast.makeText(this, "Game loaded", Toast.LENGTH_SHORT).show();
+            updatePlayerInventoryView();
+            updateScoreDisplay(candidate.score);
+            updateDeadProcessCountDisplay(candidate.deadProcessCount);
+            if (orderAdapter != null) orderAdapter.updateProcesses(gameManager.getActiveProcesses());
+            updateMediaPlaybackSpeed(candidate.deadProcessCount);
+            // LOAD is held before composition starts order/fill owners. This assertion seam
+            // records that restored orders were installed while timers stayed stopped and the
+            // initial basket filler made no mutation before the candidate was fully applied.
+            restoreWasIsolatedForTest = pauseState.isPaused(PauseState.Reason.LOAD)
+                    && !gameManager.isRunning()
+                    && gameManager.getActiveProcesses().size() == candidate.orders.size()
+                    && basketContentsBeforeRestore.equals(basketManager.getContentsSnapshotForTest());
+            loaded = true;
         } catch (Exception e) {
-            Log.e("GameActivity", "Error loading game: " + e.getMessage());
+            Log.w(TAG, "Saved run was rejected; preserving it and starting a fresh session", e);
+        } finally {
+            loadSucceededForTest = loaded;
+            if (loaded && getIntent().getBooleanExtra("pauseAfterLoadForTest", false)) {
+                gameManager.pauseGame();
+            }
+            if (gameManager != null) gameManager.setLoading(false);
         }
+        Toast.makeText(this, loaded ? "Game loaded" : "Save could not be loaded. Starting a new game.",
+                Toast.LENGTH_LONG).show();
     }
+
+    private FoodItem createSavedItem(GameSaveSnapshot.SavedItem saved) {
+        if (saved.type == PlayerInventory.INGREDIENT) return new Ingredient(saved.id);
+        List<Ingredient> madeWith = new ArrayList<>();
+        for (int id : saved.ingredients) madeWith.add(new Ingredient(id));
+        return new CookedFood(saved.id, saved.name, madeWith);
+    }
+
+    private Recipe findRecipe(String name) {
+        for (Recipe recipe : Recipe.getDefaultRecipes()) if (recipe.getName().equals(name)) return recipe;
+        return null;
+    }
+
     protected void initializeGameComponents() {
         sessionComposer.composeOnce(this::composeGameComponents);
     }
@@ -549,11 +274,18 @@ public class GameActivity extends BaseActivity implements
     PotThreadPool getPotThreadPoolForTest() { return potThreadPool; }
     GameView getGameViewForTest() { return findViewById(R.id.gameView); }
     int getDeliveredSessionCallbacksForTest() { return sessionCallbacks.deliveredCount(); }
+    boolean loadSucceededForTest() { return loadSucceededForTest; }
+    boolean restoreWasIsolatedForTest() { return restoreWasIsolatedForTest; }
+    boolean saveGameStateForTest() { return saveGameState(); }
+    GameSaveSnapshot captureSnapshotForTest() {
+        return GameSaveSnapshot.capture(game, gameManager, playerInventory);
+    }
 
     Pot startCookForTest() {
         Pot pot = game.getPots().get(0);
         Recipe recipe = Recipe.getDefaultRecipes().get(0);
         for (Ingredient ingredient : recipe.getIngredients()) pot.getPotFunctions().addIngredient(ingredient);
+        pot.getPotFunctions().beginCooking(recipe);
         pot.setState(Pot.State.COOKING.name());
         potThreadPool.submit(() -> {
             pot.getPotFunctions().cookIngredients(recipe, this);
@@ -577,6 +309,7 @@ public class GameActivity extends BaseActivity implements
 
     private void composeGameComponents() {
         if (startsWithTutorialPause()) pauseState.setPaused(PauseState.Reason.TUTORIAL, true);
+        if (getIntent().getBooleanExtra("loadSavedGame", false)) pauseState.setPaused(PauseState.Reason.LOAD, true);
         GameView gameView = findViewById(R.id.gameView);
 
         List<Recipe> recipeList=Recipe.getDefaultRecipes();

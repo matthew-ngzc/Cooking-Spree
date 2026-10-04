@@ -42,6 +42,8 @@ public class Player {
 
     public float getX() { return x; }
     public float getY() { return y; }
+    int getLogicalSaveX() { return Math.round((isMoving ? targetX : x) / tileSize) * tileSize; }
+    int getLogicalSaveY() { return Math.round((isMoving ? targetY : y) / tileSize) * tileSize; }
 
     public void draw(Canvas canvas, Paint paint, int tileSize) {
         if (sprite == null) return;
