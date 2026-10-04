@@ -51,6 +51,8 @@ Later on 2026-10-04, after Phase 0 slice 0F, `assembleDebug testDebugUnitTest as
 
 The final API 36 smoke pass also launched the app signed out with airplane mode shown, reopened persisted large-joystick settings, entered a fresh kitchen, exercised held tile movement/collision plus basket, table, and rubbish interactions, retained the visible pause menu across a background/foreground cycle, and reached one natural game-over dialog at exactly 3/3 failures. The before/after paused frames were byte-identical, confirming no visible scene progress while backgrounded. Earlier 0D and 0E evidence supplies the tutorial, active cook/fetch pause, and save/load/recovery sequences. A clean successful-submission screenshot could not be captured before the randomized short order queue expired; exact valid/invalid recipe classification, duplicate ingredients, scoring, and terminal finalization are nevertheless covered by the deterministic 32-unit/14-device suites. That visual omission is explicit in the Phase 0 plan and PR rather than being reported as a manual pass.
 
+After PR #7 was restacked on the amended PR #6 head on 2026-10-05, `testDebugUnitTest assembleDebug assembleDebugAndroidTest` passed with 36/36 unit tests and `connectedDebugAndroidTest` passed 18/18 with no skips or failures on `Medium_Phone_API_36` (`emulator-5554`, API 36). The combined run covers both the semantic save contract and the Phase 0 gameplay/finalization regressions. Terminal save restoration was adapted to the 0F `FailureCounter` seam exposed by the restack; the full device suite verifies that integration.
+
 ## Manual smoke test
 
 1. Launch in landscape; verify the menu opens and Start Game creates the kitchen.

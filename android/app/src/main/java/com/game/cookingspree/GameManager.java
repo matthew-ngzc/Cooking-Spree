@@ -224,9 +224,9 @@ public class GameManager {
     }
 
     void restoreTerminalResult(int finalScore, int failures) {
-        if (closed || isGameOver || failures != MAX_DEAD_PROCESSES) return;
+        if (closed || isGameOver || failures != FailureCounter.TERMINAL_FAILURES) return;
         score = finalScore;
-        deadProcessCount = failures;
+        failureCounter.setCount(failures);
         endGame();
     }
     private void handlePendingRemovals() {
