@@ -17,7 +17,7 @@
 - [x] 0B — Signed-out and unavailable-cloud safety. Evidence: focused tests plus the API 36 signed-out/airplane-mode launch, settings restart, and natural game-over run recorded in [development verification](../docs/development.md#current-verified-build-state).
 - [x] 0C — Single session, cancellation, and render/input teardown. Evidence: focused unit/device lifecycle checks and five repeated actual surface cycles passed; see [runtime architecture verification](../docs/architecture.md#concurrency-boundaries).
 - [x] 0D — Consistent pause and tutorial lifecycle. Evidence: focused unit tests and the API 36 8/8 connected suite passed on 2026-10-04, including independent pause reasons, tutorial movement-only allowance, manual/background resume behavior, and a 10-second active cook/fetch pause; labelled device screenshots were captured for the PR.
-- [ ] 0E — Versioned, verified saves and atomic loading. The owner-required two-slot amendment passes 32/32 unit tests and the API 36 18/18 connected suite; its concise updated recording is captured and awaits PR upload.
+- [x] 0E — Versioned, verified saves and atomic loading. The owner-required two-slot amendment passes 32/32 unit tests and the API 36 18/18 connected suite; [its concise touch-visible recording is attached to PR #6](https://github.com/matthew-ngzc/Cooking-Spree/pull/6#issuecomment-5984709101).
 - [ ] 0F — Integration evidence and delivery.
 - [ ] Owner approves and merges each Phase 0 PR.
 - [ ] Owner approves Phase 0 closeout after all delivery-map PRs are merged and the phase evidence is complete.
@@ -178,10 +178,10 @@ The owner superseded the unversioned legacy-load policy on 2026-10-05. Preserve 
 - [x] Keep a pre-two-slot versioned `GameSave` loadable as the compatibility source until successful slot adoption; clear the compatibility source, both slots, and selector when a run is rejected, completed, or cleared.
 - [x] Route menu save discovery and gameplay loading through the active-save API. Report either **Save failed. Your previous save is still available.** or **Save failed. No save was created.**
 - [x] Add deterministic regressions for first save, legacy adoption, alternating successes, candidate verification/write failure, selector-promotion failure, unchanged prior payload, prior-save loadability, and clearing. Evidence: instrumentation source compiles in `assembleDebugAndroidTest`; device execution is pending.
-- [ ] Update ADR 0007, persistence documentation, the plan, and the PR walkthrough so no rollback claim remains current. The repository documents are updated; the PR walkthrough remains pending.
+- [x] Update ADR 0007, persistence documentation, the plan, and the PR walkthrough so no rollback claim remains current. Evidence: [`0c3d5ad` walkthrough and recording](https://github.com/matthew-ngzc/Cooking-Spree/pull/6#issuecomment-5984709101).
 - [x] Run the complete API 34+ connected suite. Evidence: `testDebugUnitTest assembleDebug assembleDebugAndroidTest` passed with 32/32 unit tests, and `connectedDebugAndroidTest` passed 18/18 on `Medium_Phone_API_36` (`emulator-5554`, API 36) on 2026-10-05.
-- [x] Capture a concise touch-visible failed-save/previous-load recording. Evidence: a six-second trimmed API 36 recording shows **Save failed. Your previous save is still available**, the menu transition, the Load Game input, and restoration of score `111`; PR upload is pending.
-- [ ] **Two-slot ready gate:** automated and device evidence demonstrates that every failed attempt leaves the former active payload unchanged and loadable, successful saves alternate/promote only after verification, legacy adoption works, all stores clear together, and the PR documentation/evidence is current.
+- [x] Capture a concise touch-visible failed-save/previous-load recording. Evidence: [the six-second trimmed API 36 recording](https://github.com/matthew-ngzc/Cooking-Spree/pull/6#issuecomment-5984709101) shows **Save failed. Your previous save is still available**, the menu transition, the Load Game input, and restoration of score `111`.
+- [x] **Two-slot ready gate:** automated and device evidence demonstrates that every failed attempt leaves the former active payload unchanged and loadable, successful saves alternate/promote only after verification, legacy adoption works, all stores clear together, and the PR documentation/evidence is current.
 
 ## 0F — integration evidence and delivery
 
