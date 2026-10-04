@@ -41,6 +41,8 @@ On 2026-10-03, `clean`, `assembleDebug`, `testDebugUnitTest`, and `assembleDebug
 
 On 2026-10-04, after Phase 0 slice 0D, `testDebugUnitTest`, `assembleDebug`, and `assembleDebugAndroidTest` passed. `connectedDebugAndroidTest` passed 8/8 on `Medium_Phone_API_36` (API 36). The new device scenarios verify that tutorial movement does not resume order/cook/fetch work, manual pause survives a background/foreground cycle, a running game resumes after backgrounding, and active cooking and ingredient exchange remain unchanged through a 10-second pause before completing once after resume. A labelled screenshot sequence records the visible running, paused, background-return, explicit-resume, tutorial, movement-only, and post-skip states for the slice 0D PR.
 
+Later on 2026-10-04, after Phase 0 slice 0E, `testDebugUnitTest`, `assembleDebug`, and `assembleDebugAndroidTest` passed with 28/28 unit tests. `connectedDebugAndroidTest` passed 13/13 with no skips or failures on `Medium_Phone_API_36` (API 36). The expanded device suite verifies rich legacy restoration, invalid-load isolation, repeated non-consuming DONE-pot saves, a COOKING load/save/reload that resumes and yields one collectible item, failed-capture preservation of the previous save, and loaded-game save clearing. The parser unit suite covers malformed types, counts, IDs, states, times, coordinates, cooking progress, recipe names, terminal saves, and map-count mismatches. No live backend is involved.
+
 ## Manual smoke test
 
 1. Launch in landscape; verify the menu opens and Start Game creates the kitchen.

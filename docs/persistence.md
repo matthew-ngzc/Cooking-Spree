@@ -10,7 +10,11 @@ Purpose: safely modify saves, settings, authentication, or Firebase. For game ru
 | `GameSave` | `GameActivity` / `PrefsHelper` | player position, score/failures, held item, table items, active orders, and pot states/contents/progress. Basket selection, ingredient-fetch state, and scoring streak state are not saved. |
 | `ProcessManagerPrefs` | `GameManager` | legacy local high score written on game over. |
 
-The save format is manually keyed in `GameActivity.saveGameState()` and `loadGameState()`, not versioned. Adding/reordering objects, modifying IDs, or changing a recipe/dish representation needs a migration/default strategy and a save/load smoke test. A completed loaded game should clear the save; verify this path when changing it.
+The save format remains the existing manually keyed legacy format (it is not versioned). Saving is allowed only from the manual pause menu. `GameSaveSnapshot` captures a non-consuming in-memory snapshot, including a player's logical tile while movement is interpolating, and validates it before `PrefsHelper` replaces the old key set in one editor commit. A failed capture/validation/write does not consume pot food or replace the prior save.
+
+Loading adds a session `LOAD` pause before order scheduling and ingredient basket filling can mutate gameplay. `GameSaveParser` reads the entire `SharedPreferences.getAll()` map into a candidate and validates field types, counts, item/ingredient IDs, recipes (including legitimate `Waste`), pot consistency/progress, order times, map counts, and a nearby traversable player tile before any candidate field is applied. Invalid or terminal saves remain stored for recovery while a fresh session starts; a completed loaded game clears the save through the existing game-over path.
+
+The legacy format remains coupled to map ordering and current recipe/item naming. Adding/reordering objects, modifying IDs, or changing a recipe/dish representation needs a migration/default strategy and a save/load smoke test. Basket selection, ingredient-fetch state, and scoring streak state remain intentionally unsaved.
 
 ## Firebase / Google sign-in
 

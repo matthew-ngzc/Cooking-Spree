@@ -13,6 +13,8 @@ Purpose: change rules, interactions, HUD, recipes, scoring, tutorial wording, or
 
 Manual pause, backgrounding, and the tutorial walkthrough are separate pause reasons. Gameplay timers, order spawning/countdown, player movement and interaction, cooking, and ingredient exchange/filling advance only while no pause reason is active. Returning to the foreground removes only the background reason. Manual pause keeps its menu visible, including after backgrounding; Resume clears only the manual pause. Cooking and ingredient exchange continue with their unelapsed in-memory duration after resume.
 
+Saving is available from the manual pause menu and captures current in-memory work without consuming finished pot food. Loading validates the complete legacy save before applying it; active orders and cooking resume from their saved remaining time/progress, while invalid saves remain available for recovery and a fresh session starts.
+
 The tutorial opens paused before order scheduling. Its existing movement demonstration permits only player movement progression and input; the tutorial pause remains active, so orders, interactions, cooking, ingredient fetching, and filling stay frozen. Backgrounding during the demonstration blocks movement too. Other tutorial steps disable movement. Skip or completion removes the tutorial pause and restores the normal pause control.
 
 ## Recipes and ingredients
