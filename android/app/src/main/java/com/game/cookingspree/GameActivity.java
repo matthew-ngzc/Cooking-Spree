@@ -43,6 +43,8 @@ public class GameActivity extends BaseActivity implements
     private final HeldDirections heldDirections = new HeldDirections();
     private final SessionCallbacks sessionCallbacks = new SessionCallbacks();
     private final SessionComposer sessionComposer = new SessionComposer();
+    protected final PauseState pauseState = new PauseState();
+    private final FinalizationGate gameOverFinalization = new FinalizationGate();
     protected MediaPlayer mediaPlayer;
     protected GameManager gameManager;
     private OrderAdapter orderAdapter;
@@ -98,7 +100,7 @@ public class GameActivity extends BaseActivity implements
         Button interactButton = findViewById(R.id.interactButton);
         Log.d("Interact", "Setting up interact button listener");
         interactButton.setOnClickListener(v -> {
-            if (game != null) {
+            if (isGameplayInputAllowed() && game != null) {
                 game.interact();
                 updatePlayerInventoryView();
             } else {
@@ -126,11 +128,13 @@ public class GameActivity extends BaseActivity implements
             if (gameManager.isRunning()) {
                 gameManager.pauseGame();
                 pauseMenu.setVisibility(View.VISIBLE);
+                cancelHeldMovement();
             }
         });
         resume.setOnClickListener(v -> {
+            if (gameManager.isGameOver()) return;
             gameManager.resumeGame();
-            pauseMenu.setVisibility(View.GONE);  // Hide the pause menu
+            pauseMenu.setVisibility(gameManager.isRunning() ? View.GONE : View.VISIBLE);
         });
         save.setOnClickListener(v -> {
             saveGameState();
@@ -537,6 +541,8 @@ public class GameActivity extends BaseActivity implements
         sessionComposer.composeOnce(this::composeGameComponents);
     }
 
+    protected boolean startsWithTutorialPause() { return false; }
+
     int getSessionCompositionCountForTest() { return sessionComposer.getCompositionCount(); }
 
     IngredientFetchWorker getIngredientFetcherForTest() { return ingredientFetcher; }
@@ -552,7 +558,13 @@ public class GameActivity extends BaseActivity implements
         potThreadPool.submit(() -> {
             pot.getPotFunctions().cookIngredients(recipe, this);
             if (Thread.currentThread().isInterrupted()) return;
-            pot.setState(Pot.State.DONE.name());
+            try {
+                while (!pauseState.runIfRunning(() -> pot.setState(Pot.State.DONE.name()))) {
+                    if (!pauseState.awaitActiveDuration(0)) return;
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         });
         return pot;
     }
@@ -564,6 +576,7 @@ public class GameActivity extends BaseActivity implements
     }
 
     private void composeGameComponents() {
+        if (startsWithTutorialPause()) pauseState.setPaused(PauseState.Reason.TUTORIAL, true);
         GameView gameView = findViewById(R.id.gameView);
 
         List<Recipe> recipeList=Recipe.getDefaultRecipes();
@@ -571,14 +584,14 @@ public class GameActivity extends BaseActivity implements
         basketManager = new BasketManager(maxIngredients);
         int maxPots = 2;
         potThreadPool = new PotThreadPool(maxPots);
-        game = new Game(gameView, this, playerInventory,potThreadPool,basketManager,this);
+        game = new Game(gameView, this, playerInventory,potThreadPool,basketManager,this,pauseState);
         gameView.init(game);
 
         setupMovementControls();
         initializeUIComponents();
         initializeInventory();
 
-        gameManager = new GameManager(this, this,recipeList);
+        gameManager = new GameManager(this, this,recipeList,pauseState);
         game.setGameManager(gameManager);
         gameManager.startGame();
 
@@ -614,7 +627,7 @@ public class GameActivity extends BaseActivity implements
                     Runnable movementRunnable = new Runnable() {
                         @Override
                         public void run() {
-                            if (!sessionCallbacks.isOpen() || !heldDirections.isHeld(direction)) return;
+                            if (!sessionCallbacks.isOpen() || !heldDirections.isHeld(direction) || !isMovementInputAllowed()) return;
                             movementAction.run();
                             if (heldDirections.isHeld(direction)) moveHandler.postDelayed(this, 150);
                         }
@@ -659,7 +672,7 @@ public class GameActivity extends BaseActivity implements
 
     protected void initializeInventory() {
         try {
-            ingredientFetcher = new IngredientFetchWorker(maxIngredients,basketManager);
+            ingredientFetcher = new IngredientFetchWorker(maxIngredients,basketManager,pauseState);
             initializeViewLists();
             initIngredientViews();
         } catch (Exception e) {
@@ -786,6 +799,7 @@ public class GameActivity extends BaseActivity implements
     }
 
     private void handleAvailableIngredientClick(int index) {
+        if (!isGameplayInputAllowed()) return;
         //Onclick handler
         try {
             if (selectedIngredientIndex != -1 && ingredientFetcher != null) {
@@ -890,6 +904,7 @@ public class GameActivity extends BaseActivity implements
     }
 
     private void handleInventoryItemClick(int index) {
+        if (!isGameplayInputAllowed()) return;
         //Inventory click handler, set selectedIngredientIndex and appropriate styling
         try {
             Log.d(TAG, "Clicked ingredientInventory index: " + index);
@@ -966,13 +981,13 @@ public class GameActivity extends BaseActivity implements
     @Override
     public void fetchIngredientProgressUpdate(int progress){
         //Add progress updater for ingredient fetch
-        postSessionUi(() -> Log.d(TAG,"Received progress update for ingredient:"+progress));
+        postRunningSessionUi(() -> Log.d(TAG,"Received progress update for ingredient:"+progress));
     }
 
     @Override
     public void finishedBasketFilling(List<Ingredient> fillOrder){
         //Listener to update ui when baskets are changed
-        postSessionUi(() -> {
+        postRunningSessionUi(() -> {
             try {
                 updateAvailableUI();
                 updateInventoryUI(fillOrder);
@@ -1001,7 +1016,7 @@ public class GameActivity extends BaseActivity implements
     @Override
     public void potProgressUpdate(int progress){
         //Add progress updates for pot
-        postSessionUi(() -> Log.d(TAG,"Received progress update for pot:"+progress));
+        postRunningSessionUi(() -> Log.d(TAG,"Received progress update for pot:"+progress));
     }
 
     private void resetSelectionState() {
@@ -1041,9 +1056,7 @@ public class GameActivity extends BaseActivity implements
         cancelHeldMovement();
         super.onPause();
         try {
-            if (gameManager != null) {
-                gameManager.pauseGame();
-            }
+            if (gameManager != null) gameManager.pauseForBackground();
 
             if (mediaPlayer != null && mediaPlayer.isPlaying()) {
                 mediaPlayer.pause();
@@ -1059,9 +1072,8 @@ public class GameActivity extends BaseActivity implements
         try {
             hideSystemUI();
 
-            if (gameManager != null) {
-                gameManager.resumeGame();
-            }
+            if (gameManager != null) gameManager.resumeFromBackground();
+            refreshPauseUi();
 
             if (mediaPlayer != null) {
                 mediaPlayer.start();
@@ -1078,6 +1090,10 @@ public class GameActivity extends BaseActivity implements
         cancelHeldMovement();
         super.onStop();
     }
+
+    protected boolean isMovementInputAllowed() { return pauseState.isMovementAllowed(); }
+
+    protected boolean isGameplayInputAllowed() { return gameManager != null && gameManager.isRunning(); }
 
     @Override
     protected void onDestroy() {
@@ -1209,16 +1225,23 @@ public class GameActivity extends BaseActivity implements
     @Override
     public void onGameOver(int finalScore) {
         postSessionUi(() -> {
-            GameOverPersistence.complete(finalScore, new GameOverPersistence.StatsStore() {
+            gameOverFinalization.runOnce(() -> {
+              cancelHeldMovement();
+              View pauseMenu = findViewById(R.id.pauseMenu);
+              if (pauseMenu != null) pauseMenu.setVisibility(View.GONE);
+              View togglePause = findViewById(R.id.togglePauseButton);
+              if (togglePause != null) togglePause.setEnabled(false);
+              GameOverPersistence.complete(finalScore, new GameOverPersistence.StatsStore() {
                 @Override public int getHighScore() { return PrefsHelper.getHighScore(); }
                 @Override public int getGamesPlayed() { return PrefsHelper.getGamesPlayed(); }
                 @Override public float getAverageScore() { return PrefsHelper.getAverageScore(); }
                 @Override public void setHighScore(int score) { PrefsHelper.setHighScore(score); }
                 @Override public void setAverageScore(float score) { PrefsHelper.setAverageScore(score); }
                 @Override public void setGamesPlayed(int count) { PrefsHelper.setGamesPlayed(count); }
-            }, PrefsHelper::clearSaveState);
-            GameOverDialog gameOverDialog = new GameOverDialog(this, finalScore);
-            gameOverDialog.show();
+              }, PrefsHelper::clearSaveState);
+              GameOverDialog gameOverDialog = new GameOverDialog(this, finalScore);
+              gameOverDialog.show();
+            });
         });
     }
 
@@ -1229,8 +1252,32 @@ public class GameActivity extends BaseActivity implements
         if (game != null && game.getPlayer() != null) game.getPlayer().stopMovement();
     }
 
+    private void refreshPauseUi() {
+        if (gameManager == null) return;
+        View pauseMenu = findViewById(R.id.pauseMenu);
+        if (pauseMenu != null) {
+            if (gameManager.isGameOver()) pauseMenu.setVisibility(View.GONE);
+            else if (!pauseState.isPaused(PauseState.Reason.TUTORIAL)) {
+                View settingsMenu = findViewById(R.id.SettingsMenu);
+                boolean settingsOpen = settingsMenu != null && settingsMenu.getVisibility() == View.VISIBLE;
+                pauseMenu.setVisibility(gameManager.isRunning() || settingsOpen ? View.GONE : View.VISIBLE);
+            }
+        }
+    }
+
     private void postSessionUi(Runnable callback) {
         if (!sessionCallbacks.isOpen()) return;
         runOnUiThread(() -> sessionCallbacks.runIfOpen(callback));
+    }
+
+    private void postRunningSessionUi(Runnable callback) {
+        if (!sessionCallbacks.isOpen()) return;
+        Runnable[] deliver = new Runnable[1];
+        deliver[0] = () -> {
+            if (!sessionCallbacks.isOpen() || pauseState.isTerminal()) return;
+            if (pauseState.isRunning()) sessionCallbacks.runIfOpen(callback);
+            else moveHandler.postDelayed(deliver[0], 50);
+        };
+        runOnUiThread(deliver[0]);
     }
 }

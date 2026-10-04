@@ -75,13 +75,12 @@ public class Player {
 
 
     public void move(int dx, int dy) {
-        movementHeld = true;
-        queuedDX = dx;
-        queuedDY = dy;
-
-        if (!isMoving) {
-            moveToNextTile();
-        }
+        game.runMovementIfAllowed(() -> {
+            movementHeld = true;
+            queuedDX = dx;
+            queuedDY = dy;
+            if (!isMoving) moveToNextTile();
+        });
     }
     public void stopMovement() {
         movementHeld = false;
@@ -115,6 +114,10 @@ public class Player {
 
 
     public void update() {
+        game.runMovementIfAllowed(this::updateWhileRunning);
+    }
+
+    private void updateWhileRunning() {
         if (!isMoving) return;
 
         float dx = targetX - x;
@@ -141,13 +144,18 @@ public class Player {
         final float bounceDist = 10f; // how much to nudge
         final int duration = 50;      // how fast it returns
 
-        x += dx * bounceDist;
-        y += dy * bounceDist;
-
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            x -= dx * bounceDist;
-            y -= dy * bounceDist;
-        }, duration);
+        boolean nudged = game.runMovementIfAllowed(() -> { x += dx * bounceDist; y += dy * bounceDist; });
+        if (!nudged) return;
+        Handler handler = new Handler(Looper.getMainLooper());
+        Runnable[] reset = new Runnable[1];
+        reset[0] = () -> {
+            if (game.isMovementAllowed()) {
+                game.runMovementIfAllowed(() -> { x -= dx * bounceDist; y -= dy * bounceDist; });
+            } else if (!game.isSessionFinished()) {
+                handler.postDelayed(reset[0], duration);
+            }
+        };
+        handler.postDelayed(reset[0], duration);
     }
 
     public Game getGame() {

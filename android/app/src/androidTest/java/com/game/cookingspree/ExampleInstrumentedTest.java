@@ -5,6 +5,8 @@ import android.content.Intent;
 import android.app.Activity;
 import android.os.SystemClock;
 import android.view.ViewGroup;
+import android.view.View;
+import android.widget.Button;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -51,6 +53,82 @@ public class ExampleInstrumentedTest {
             }
             assertTrue("manager should close after tutorial exit", manager.isClosed());
         }
+    }
+
+    @Test
+    public void tutorialMovementStepAllowsMovementOnlyAndSkipStartsOneSession() {
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        TutorialActivity tutorial = (TutorialActivity) instrumentation.startActivitySync(
+                new Intent(instrumentation.getTargetContext(), TutorialActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        assertFalse(tutorial.gameManager.isRunning());
+        assertTrue(tutorial.gameManager.getActiveProcesses().isEmpty());
+        assertFalse(tutorial.pauseState.isMovementAllowed());
+
+        instrumentation.runOnMainSync(() -> ((Button) tutorial.findViewById(R.id.tutorialNextButton)).performClick());
+        assertFalse(tutorial.gameManager.isRunning());
+        assertTrue(tutorial.pauseState.isMovementAllowed());
+        assertTrue(tutorial.gameManager.getActiveProcesses().isEmpty());
+
+        instrumentation.runOnMainSync(() -> ((Button) tutorial.findViewById(R.id.tutorialSkipButton)).performClick());
+        assertTrue(tutorial.gameManager.isRunning());
+        assertTrue(tutorial.pauseState.isRunning());
+        assertEquals(1, tutorial.getSessionCompositionCountForTest());
+        finishAndAwaitClosed(instrumentation, tutorial);
+    }
+
+    @Test
+    public void backgroundForegroundPreservesManualPauseAndResumesRunningGame() {
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        GameActivity activity = launchGame(instrumentation);
+        instrumentation.runOnMainSync(() -> ((Button) activity.findViewById(R.id.togglePauseButton)).performClick());
+        instrumentation.runOnMainSync(() -> instrumentation.callActivityOnPause(activity));
+        instrumentation.runOnMainSync(() -> instrumentation.callActivityOnResume(activity));
+        assertFalse(activity.gameManager.isRunning());
+        assertEquals(View.VISIBLE, activity.findViewById(R.id.pauseMenu).getVisibility());
+        instrumentation.runOnMainSync(() -> ((Button) activity.findViewById(R.id.btnResume)).performClick());
+        assertTrue(activity.gameManager.isRunning());
+
+        instrumentation.runOnMainSync(() -> instrumentation.callActivityOnPause(activity));
+        instrumentation.runOnMainSync(() -> instrumentation.callActivityOnResume(activity));
+        assertTrue(activity.gameManager.isRunning());
+        finishAndAwaitClosed(instrumentation, activity);
+    }
+
+    @Test
+    public void activeCookAndFetchPreserveRemainingWorkAcrossTenSecondPause() {
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        GameActivity activity = launchGame(instrumentation);
+        Pot pot = instrumentationCall(instrumentation, activity::startCookForTest);
+        IngredientFetchWorker fetcher = activity.getIngredientFetcherForTest();
+        java.util.List<Ingredient> availableBeforeFetch = fetcher.getAvailableList();
+        java.util.List<Ingredient> usedBeforeFetch = fetcher.getUsedListForTest();
+        instrumentation.runOnMainSync(activity::startFetchForTest);
+        await(() -> fetcher.isFetchingForTest()
+                        && pot.getPotFunctions().getCookProgress() > 0,
+                3_000, "cook and ingredient fetch did not both start");
+
+        instrumentation.runOnMainSync(activity.gameManager::pauseGame);
+        int cookProgressAtPause = pot.getPotFunctions().getCookProgress();
+        int ordersAtPause = activity.gameManager.getActiveProcesses().size();
+        java.util.List<Integer> orderTimesAtPause = new java.util.ArrayList<>();
+        for (Order order : activity.gameManager.getActiveProcesses()) orderTimesAtPause.add(order.getTimeRemaining());
+        SystemClock.sleep(10_000);
+
+        assertEquals(cookProgressAtPause, pot.getPotFunctions().getCookProgress());
+        assertFalse(pot.getPotFunctions().gotFood());
+        assertEquals(availableBeforeFetch, fetcher.getAvailableList());
+        assertEquals(usedBeforeFetch, fetcher.getUsedListForTest());
+        assertEquals(ordersAtPause, activity.gameManager.getActiveProcesses().size());
+        java.util.List<Integer> orderTimesAfterPause = new java.util.ArrayList<>();
+        for (Order order : activity.gameManager.getActiveProcesses()) orderTimesAfterPause.add(order.getTimeRemaining());
+        assertEquals(orderTimesAtPause, orderTimesAfterPause);
+
+        instrumentation.runOnMainSync(activity.gameManager::resumeGame);
+        await(() -> pot.getPotFunctions().gotFood(), 8_000, "pot did not complete after resume");
+        await(() -> !usedBeforeFetch.equals(fetcher.getUsedListForTest()), 5_000,
+                "ingredient fetch did not finish after resume");
+        finishAndAwaitClosed(instrumentation, activity);
     }
 
     @Test
