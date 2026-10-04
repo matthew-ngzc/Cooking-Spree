@@ -2,16 +2,21 @@ package com.game.cookingspree;
 
 import org.junit.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertTrue;
+
+import java.util.Arrays;
 
 /**
- * Example local unit test, which will execute on the development machine (host).
- *
- * @see <a href="http://d.android.com/tools/testing">Testing documentation</a>
+ * Small recipe-ordering regression; the broader gameplay rule cases live in GameplayRulesTest.
  */
 public class ExampleUnitTest {
     @Test
-    public void addition_isCorrect() {
-        assertEquals(4, 2 + 2);
+    public void tomatoSoupAcceptsItsExactIngredientsInAnyOrder() {
+        Recipe tomatoSoup = Recipe.getDefaultRecipes().get(0);
+
+        assertTrue(tomatoSoup.canCook(Arrays.asList(
+                new Ingredient(Recipe.ONION),
+                new Ingredient(Recipe.CARROT),
+                new Ingredient(Recipe.TOMATO))));
     }
 }

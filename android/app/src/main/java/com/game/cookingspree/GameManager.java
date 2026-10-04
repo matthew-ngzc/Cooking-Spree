@@ -13,7 +13,6 @@ import android.os.SystemClock;
 
 public class GameManager {
     private static final String TAG = "GameManager";
-    private static final int MAX_DEAD_PROCESSES = 3;
     private static final int TIMER_INTERVAL_MS = 16; // Update more frequently for smoother animation (~60 FPS)
     private static final int MAX_ACTIVE_PROCESSES = 5; // Maximum number of active processes
 
@@ -30,11 +29,8 @@ public class GameManager {
 
     private final List<Recipe> availableRecipes;
     private int score;
-    private int streakCount;
-    private long lastCompletionTime = 0L; // in milliseconds
-    private static final long STREAK_TIME_LIMIT = 10_000L; // 10 seconds in milliseconds
-    private static final int BASE_POINTS = 100;
-    private int deadProcessCount;
+    private final CompletionScoring completionScoring = new CompletionScoring();
+    private final FailureCounter failureCounter = new FailureCounter();
     private boolean isGameOver;
     private final Random random;
     private final Handler mainHandler;
@@ -69,7 +65,8 @@ public class GameManager {
         this.pendingRemovals = new ArrayList<>();
         this.availableRecipes = recipeList;
         this.score = 0;
-        this.deadProcessCount = 0;
+        this.failureCounter.reset();
+        this.completionScoring.reset();
         this.isGameOver = false;
         this.random = new Random();
         this.pauseState = pauseState;
@@ -92,7 +89,8 @@ public class GameManager {
         Log.d(TAG, "Starting game");
         isGameOver = false;
         score = 0;
-        deadProcessCount = 0;
+        failureCounter.reset();
+        completionScoring.reset();
 
         // Clear any existing processes
         synchronized (mutex) {
@@ -198,7 +196,7 @@ public class GameManager {
     private void handleDeadProcess(Order order) {
         Log.d(TAG, "Process died: " + order.getName());
 
-        deadProcessCount++;
+        boolean terminalFailureReached = failureCounter.recordExpiry();
 
         // Add to pending removals
         synchronized (mutex) {
@@ -211,16 +209,16 @@ public class GameManager {
         }
 
         // Check game over condition
-        if (deadProcessCount >= MAX_DEAD_PROCESSES) {
+        if (terminalFailureReached) {
             endGame();
         }
     }
 
     public void setDeadProcessCount(int count) {
         if (closed) return;
-        this.deadProcessCount = count;
+        this.failureCounter.setCount(count);
 
-        if (deadProcessCount >= MAX_DEAD_PROCESSES && !isGameOver) {
+        if (failureCounter.isTerminal() && !isGameOver) {
             endGame();
         }
     }
@@ -259,20 +257,9 @@ public class GameManager {
             orderToComplete.completeOrder();
             // Check if the process was successfully completed
             if (!orderToComplete.isDead()) {
-                long currentTime = System.currentTimeMillis();
-
-                if (lastCompletionTime > 0 && (currentTime - lastCompletionTime <= STREAK_TIME_LIMIT)) {
-                    streakCount++;
-                } else {
-                    streakCount = 1; // reset streak to 1 (not 0) because we still scored
-                }
-
-                int pointsEarned = BASE_POINTS * streakCount;
-                score += pointsEarned;
-                lastCompletionTime = currentTime;
+                score += completionScoring.awardForCompletionAt(System.currentTimeMillis());
             } else {
-                streakCount = 0;
-                lastCompletionTime = 0;
+                completionScoring.reset();
             }
 
             // Add to pending removals to be cleared next tick
@@ -287,8 +274,7 @@ public class GameManager {
                 gameListener.onScoreChanged(score);
             }
         } else{
-            streakCount = 0;
-            lastCompletionTime= 0;
+            completionScoring.reset();
         }
     }
 
@@ -388,7 +374,7 @@ public class GameManager {
     }
 
     public int getDeadProcessCount() {
-        return deadProcessCount;
+        return failureCounter.getCount();
     }
 
     public boolean isGameOver() {
