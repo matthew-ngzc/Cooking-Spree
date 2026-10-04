@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="game_saved">Game saved</string>
+    <string name="game_save_failed_previous_available">Save failed. Your previous save is still available.</string>
+    <string name="game_save_failed_none_created">Save failed. No save was created.</string>
     <string name="app_name">Cooking Spree</string>
 
     <!-- Game UI Strings -->

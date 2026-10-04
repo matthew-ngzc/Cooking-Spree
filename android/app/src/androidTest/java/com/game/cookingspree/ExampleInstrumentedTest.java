@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.app.Activity;
 import android.os.SystemClock;
+import android.view.MotionEvent;
 import android.view.ViewGroup;
 import android.view.View;
 import android.widget.Button;
@@ -12,6 +13,9 @@ import android.widget.Button;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
+import com.game.cookingspree.util.PrefsHelper;
+
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -24,6 +28,12 @@ import static org.junit.Assert.*;
  */
 @RunWith(AndroidJUnit4.class)
 public class ExampleInstrumentedTest {
+    @Before
+    public void resetSavedGameStorage() {
+        PrefsHelper.init(InstrumentationRegistry.getInstrumentation().getTargetContext(), null);
+        PrefsHelper.clearSaveState();
+    }
+
     @Test
     public void useAppContext() {
         // Context of the app under test.
@@ -195,7 +205,7 @@ public class ExampleInstrumentedTest {
         android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         Context appContext = instrumentation.getTargetContext();
         SharedPreferences saves = appContext.getSharedPreferences("GameSave", Context.MODE_PRIVATE);
-        saves.edit().clear().commit();
+        PrefsHelper.clearSaveState();
 
         GameActivity source = launchGame(instrumentation);
         GameSaveSnapshot captured = instrumentationCall(instrumentation, source::captureSnapshotForTest);
@@ -237,7 +247,7 @@ public class ExampleInstrumentedTest {
         instrumentation.runOnMainSync(rejected::acknowledgeRecoveryForTest);
         finishAndAwaitClosed(instrumentation, rejected);
         assertTrue("acknowledgment clears the rejected save", saves.getAll().isEmpty());
-        saves.edit().clear().commit();
+        PrefsHelper.clearSaveState();
     }
 
     @Test
@@ -245,7 +255,7 @@ public class ExampleInstrumentedTest {
         android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         SharedPreferences saves = instrumentation.getTargetContext()
                 .getSharedPreferences("GameSave", Context.MODE_PRIVATE);
-        saves.edit().clear().commit();
+        PrefsHelper.clearSaveState();
         GameActivity source = launchGame(instrumentation);
         GameSaveSnapshot empty = instrumentationCall(instrumentation, source::captureSnapshotForTest);
 
@@ -281,7 +291,7 @@ public class ExampleInstrumentedTest {
         assertEquals(java.util.Arrays.asList(1), ingredientIds(loaded.game.getPots().get(0).getInPot()));
         assertEquals(java.util.Arrays.asList(4, 4), ingredientIds(loaded.game.getPots().get(1).getInPot()));
         finishAndAwaitClosed(instrumentation, loaded);
-        saves.edit().clear().commit();
+        PrefsHelper.clearSaveState();
     }
 
     @Test
@@ -289,7 +299,7 @@ public class ExampleInstrumentedTest {
         android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         SharedPreferences saves = instrumentation.getTargetContext()
                 .getSharedPreferences("GameSave", Context.MODE_PRIVATE);
-        saves.edit().clear().commit();
+        PrefsHelper.clearSaveState();
         GameActivity source = launchGame(instrumentation);
         GameSaveSnapshot empty = instrumentationCall(instrumentation, source::captureSnapshotForTest);
         GameSaveSnapshot.SavedPot cooking = new GameSaveSnapshot.SavedPot(Pot.State.COOKING,
@@ -325,32 +335,94 @@ public class ExampleInstrumentedTest {
         assertEquals("Tomato Soup", collected.getName());
         assertNull("finished food should be collectible only once", resumedPot.getFood());
         finishAndAwaitClosed(instrumentation, secondLoad);
-        saves.edit().clear().commit();
+        PrefsHelper.clearSaveState();
     }
 
     @Test
-    public void failedSnapshotPreservesPriorSaveAndLoadedTerminalRunClearsIt() {
+    public void twoSlotFailuresNeverReplacePriorSaveAndLoadedTerminalRunClearsIt() {
         android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        Context appContext = instrumentation.getTargetContext();
         SharedPreferences saves = instrumentation.getTargetContext()
                 .getSharedPreferences("GameSave", Context.MODE_PRIVATE);
-        saves.edit().clear().commit();
+        PrefsHelper.clearSaveState();
         GameActivity activity = launchGame(instrumentation);
         GameSaveSnapshot valid = instrumentationCall(instrumentation, activity::captureSnapshotForTest);
+        finishAndAwaitClosed(instrumentation, activity);
+
+        assertFalse(PrefsHelper.hasGameSave());
+        assertTrue("the first verified save promotes into slot A",
+                PrefsHelper.writeGameSaveValues(valid.toLegacyValues()));
+        assertEquals("A", PrefsHelper.activeGameSaveSlotForTest());
+        assertEquals(valid.toLegacyValues(), PrefsHelper.getGameSaveValues());
+
         writeLegacyFixture(saves, valid.toLegacyValues());
+        java.util.Map<String, ?> prior = new java.util.HashMap<>(valid.toLegacyValues());
+
         java.util.Map<String, Object> unverifiable = new java.util.HashMap<>(valid.toLegacyValues());
         unverifiable.put("score", 999);
         assertFalse("failed readback validation must fail the save",
-                com.game.cookingspree.util.PrefsHelper.writeGameSaveValues(unverifiable, stored -> false));
-        assertEquals("failed verification rolls back to the previous save", valid.toLegacyValues(), saves.getAll());
-        java.util.Map<String, ?> beforeFailedSave = new java.util.HashMap<>(saves.getAll());
-        Pot inconsistent = activity.game.getPots().get(0);
+                PrefsHelper.writeGameSaveValues(unverifiable, stored -> false));
+        assertEquals("verification failure keeps legacy save active", "legacy",
+                PrefsHelper.activeGameSaveSlotForTest());
+        assertEquals(prior, PrefsHelper.getGameSaveValues());
+        assertEquals("the prior payload itself is untouched", prior, saves.getAll());
+
+        PrefsHelper.failNextGameSaveSlotWriteForTest();
+        assertFalse("candidate slot write failure must fail the save",
+                PrefsHelper.writeGameSaveValues(unverifiable));
+        assertEquals("legacy", PrefsHelper.activeGameSaveSlotForTest());
+        assertEquals(prior, PrefsHelper.getGameSaveValues());
+
+        PrefsHelper.failNextGameSavePromotionForTest();
+        assertFalse("selector promotion failure must fail the save",
+                PrefsHelper.writeGameSaveValues(unverifiable));
+        assertEquals("legacy", PrefsHelper.activeGameSaveSlotForTest());
+        assertEquals(prior, PrefsHelper.getGameSaveValues());
+        assertEquals(prior, saves.getAll());
+
+        GameActivity priorLoad = launchLoadGame(instrumentation);
+        assertTrue("the prior save remains loadable after every failed attempt",
+                priorLoad.loadSucceededForTest());
+        assertEquals(valid.score, priorLoad.gameManager.getScore());
+        finishAndAwaitClosed(instrumentation, priorLoad);
+
+        GameActivity inconsistentSource = launchGame(instrumentation);
+        Pot inconsistent = inconsistentSource.game.getPots().get(0);
         instrumentation.runOnMainSync(() -> {
-            activity.gameManager.pauseGame();
-            inconsistent.setState(Pot.State.DONE.name()); // No food: snapshot must reject this live state.
-            assertFalse("inconsistent live capture should fail", activity.saveGameStateForTest());
+            inconsistentSource.gameManager.pauseGame();
+            inconsistent.setState(Pot.State.DONE.name()); // No food: snapshot capture must reject this state.
+            assertFalse("failed live capture must fail the save", inconsistentSource.saveGameStateForTest());
         });
-        assertEquals(beforeFailedSave, saves.getAll());
-        finishAndAwaitClosed(instrumentation, activity);
+        assertEquals("legacy", PrefsHelper.activeGameSaveSlotForTest());
+        assertEquals(prior, PrefsHelper.getGameSaveValues());
+        assertEquals(prior, saves.getAll());
+        finishAndAwaitClosed(instrumentation, inconsistentSource);
+
+        java.util.Map<String, Object> firstSuccess = new java.util.HashMap<>(valid.toLegacyValues());
+        firstSuccess.put("score", 111);
+        assertTrue(PrefsHelper.writeGameSaveValues(firstSuccess));
+        assertEquals("A", PrefsHelper.activeGameSaveSlotForTest());
+        assertEquals(firstSuccess, PrefsHelper.getGameSaveValues());
+        assertEquals("legacy remains the fallback through the first promotion", prior, saves.getAll());
+
+        SharedPreferences slotA = appContext.getSharedPreferences("GameSaveSlotA", Context.MODE_PRIVATE);
+        java.util.Map<String, ?> firstSlotBeforeFailure = new java.util.HashMap<>(slotA.getAll());
+        java.util.Map<String, Object> secondSuccess = new java.util.HashMap<>(valid.toLegacyValues());
+        secondSuccess.put("score", 222);
+        PrefsHelper.failNextGameSavePromotionForTest();
+        assertFalse(PrefsHelper.writeGameSaveValues(secondSuccess));
+        assertEquals("A", PrefsHelper.activeGameSaveSlotForTest());
+        assertEquals(firstSuccess, PrefsHelper.getGameSaveValues());
+        assertEquals("active slot is never rewritten by a failed attempt",
+                firstSlotBeforeFailure, slotA.getAll());
+
+        assertTrue(PrefsHelper.writeGameSaveValues(secondSuccess));
+        assertEquals("B", PrefsHelper.activeGameSaveSlotForTest());
+        assertEquals(secondSuccess, PrefsHelper.getGameSaveValues());
+        assertEquals("the previous slot remains intact after promotion",
+                firstSlotBeforeFailure, slotA.getAll());
+        assertTrue("legacy compatibility storage is retired after both slots participate",
+                saves.getAll().isEmpty());
 
         GameActivity loadSource = launchGame(instrumentation);
         GameSaveSnapshot candidate = instrumentationCall(instrumentation, loadSource::captureSnapshotForTest);
@@ -359,9 +431,49 @@ public class ExampleInstrumentedTest {
         GameActivity loaded = launchLoadGame(instrumentation);
         assertTrue(loaded.loadSucceededForTest());
         instrumentation.runOnMainSync(() -> loaded.gameManager.setDeadProcessCount(3));
-        await(() -> saves.getAll().isEmpty(), 2_000, "loaded game over should clear GameSave");
-        assertTrue("later load must have no candidate", saves.getAll().isEmpty());
+        await(() -> PrefsHelper.getGameSaveValues().isEmpty(), 2_000,
+                "loaded game over should clear every save slot");
+        assertFalse("later load must have no candidate", PrefsHelper.hasGameSave());
         finishAndAwaitClosed(instrumentation, loaded);
+    }
+
+    @Test
+    public void failedSaveButtonKeepsAndReloadsPreviousVerifiedSlot() {
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        GameActivity activity = launchGame(instrumentation);
+        instrumentation.runOnMainSync(() -> {
+            activity.gameManager.pauseGame();
+            activity.findViewById(R.id.pauseMenu).setVisibility(View.VISIBLE);
+            activity.gameManager.setScore(111);
+            assertTrue(activity.saveGameStateForTest());
+            activity.gameManager.setScore(222);
+            PrefsHelper.failNextGameSavePromotionForTest();
+        });
+
+        tapView(instrumentation, activity.findViewById(R.id.btnSave));
+        assertEquals("A", PrefsHelper.activeGameSaveSlotForTest());
+        assertEquals(111, ((Integer) PrefsHelper.getGameSaveValues().get("score")).intValue());
+        SystemClock.sleep(1_800); // Keep the failure explanation legible in review evidence.
+
+        android.app.Instrumentation.ActivityMonitor menuMonitor = instrumentation.addMonitor(
+                MainActivity.class.getName(), null, false);
+        tapView(instrumentation, activity.findViewById(R.id.btnMainMenu));
+        Activity menu = menuMonitor.waitForActivityWithTimeout(3_000);
+        instrumentation.removeMonitor(menuMonitor);
+        assertTrue(menu instanceof MainActivity);
+
+        android.app.Instrumentation.ActivityMonitor loadMonitor = instrumentation.addMonitor(
+                GameActivity.class.getName(), null, false);
+        tapView(instrumentation, menu.findViewById(R.id.LoadGame));
+        Activity reloaded = loadMonitor.waitForActivityWithTimeout(3_000);
+        instrumentation.removeMonitor(loadMonitor);
+        assertTrue(reloaded instanceof GameActivity);
+        GameActivity loaded = (GameActivity) reloaded;
+        assertTrue(loaded.loadSucceededForTest());
+        assertEquals("failed save must reload the previous score", 111, loaded.gameManager.getScore());
+        SystemClock.sleep(1_200); // Leave the restored result visible before teardown.
+        finishAndAwaitClosed(instrumentation, loaded);
+        instrumentation.runOnMainSync(menu::finish);
     }
 
     @Test
@@ -369,7 +481,8 @@ public class ExampleInstrumentedTest {
         android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         SharedPreferences saves = instrumentation.getTargetContext()
                 .getSharedPreferences("GameSave", Context.MODE_PRIVATE);
-        saves.edit().clear().putString("gameVersion", "2.4.1").commit();
+        PrefsHelper.clearSaveState();
+        saves.edit().putString("gameVersion", "2.4.1").commit();
 
         GameActivity rejected = launchLoadGame(instrumentation);
         assertFalse(rejected.loadSucceededForTest());
@@ -390,7 +503,7 @@ public class ExampleInstrumentedTest {
         android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         SharedPreferences saves = instrumentation.getTargetContext()
                 .getSharedPreferences("GameSave", Context.MODE_PRIVATE);
-        saves.edit().clear().commit();
+        PrefsHelper.clearSaveState();
         GameActivity source = launchGame(instrumentation);
         GameSaveSnapshot save = instrumentationCall(instrumentation, source::captureSnapshotForTest);
         finishAndAwaitClosed(instrumentation, source);
@@ -419,7 +532,7 @@ public class ExampleInstrumentedTest {
         android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         SharedPreferences saves = instrumentation.getTargetContext()
                 .getSharedPreferences("GameSave", Context.MODE_PRIVATE);
-        saves.edit().clear().commit();
+        PrefsHelper.clearSaveState();
         GameActivity source = launchGame(instrumentation);
         GameSaveSnapshot captured = instrumentationCall(instrumentation, source::captureSnapshotForTest);
         GameSaveSnapshot terminal = new GameSaveSnapshot(captured.gameVersion, captured.playerX, captured.playerY,
@@ -440,7 +553,7 @@ public class ExampleInstrumentedTest {
         android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         Context appContext = instrumentation.getTargetContext();
         SharedPreferences saves = appContext.getSharedPreferences("GameSave", Context.MODE_PRIVATE);
-        saves.edit().clear().commit();
+        PrefsHelper.clearSaveState();
         GameActivity activity = launchGame(instrumentation);
         Recipe recipe = Recipe.getDefaultRecipes().get(0);
         Pot pot = activity.game.getPots().get(0);
@@ -455,7 +568,7 @@ public class ExampleInstrumentedTest {
         assertNotNull("saved food remains collectible", pot.getFood());
         assertNull("food is collected only once", pot.getFood());
         finishAndAwaitClosed(instrumentation, activity);
-        saves.edit().clear().commit();
+        PrefsHelper.clearSaveState();
     }
 
     @Test
@@ -502,7 +615,24 @@ public class ExampleInstrumentedTest {
         return (GameActivity) launched;
     }
 
+    private static void tapView(android.app.Instrumentation instrumentation, View view) {
+        instrumentation.waitForIdleSync();
+        int[] location = new int[2];
+        instrumentation.runOnMainSync(() -> view.getLocationOnScreen(location));
+        float x = location[0] + view.getWidth() / 2f;
+        float y = location[1] + view.getHeight() / 2f;
+        long downTime = SystemClock.uptimeMillis();
+        MotionEvent down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0);
+        MotionEvent up = MotionEvent.obtain(downTime, downTime + 80, MotionEvent.ACTION_UP, x, y, 0);
+        instrumentation.sendPointerSync(down);
+        instrumentation.sendPointerSync(up);
+        down.recycle();
+        up.recycle();
+        instrumentation.waitForIdleSync();
+    }
+
     private static void writeLegacyFixture(SharedPreferences preferences, java.util.Map<String, ?> values) {
+        PrefsHelper.clearSaveState();
         SharedPreferences.Editor editor = preferences.edit().clear();
         for (java.util.Map.Entry<String, ?> entry : values.entrySet()) {
             Object value = entry.getValue();

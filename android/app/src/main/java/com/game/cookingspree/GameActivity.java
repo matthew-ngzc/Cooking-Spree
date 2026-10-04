@@ -140,8 +140,12 @@ public class GameActivity extends BaseActivity implements
             pauseMenu.setVisibility(gameManager.isRunning() ? View.GONE : View.VISIBLE);
         });
         save.setOnClickListener(v -> {
+            boolean hadPreviousSave = PrefsHelper.hasGameSave();
             boolean saved = saveGameState();
-            Toast.makeText(this, saved ? "Game saved" : "Unable to save game", Toast.LENGTH_SHORT).show();
+            int message = saved ? R.string.game_saved
+                    : hadPreviousSave ? R.string.game_save_failed_previous_available
+                    : R.string.game_save_failed_none_created;
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
         });
         settings.setOnClickListener(v -> {
             settingsMenu.setVisibility(View.VISIBLE);
@@ -191,7 +195,7 @@ public class GameActivity extends BaseActivity implements
     private void loadGameState() {
         View activityContent = findViewById(android.R.id.content);
         activityContent.setVisibility(INVISIBLE);
-        Map<String, ?> stored = getSharedPreferences("GameSave", MODE_PRIVATE).getAll();
+        Map<String, ?> stored = PrefsHelper.getGameSaveValues();
         Object rawVersion = stored.get("gameVersion");
         String savedVersion = rawVersion instanceof String ? (String) rawVersion : null;
         if (GameVersionPolicy.compatibility(savedVersion, BuildConfig.VERSION_NAME)

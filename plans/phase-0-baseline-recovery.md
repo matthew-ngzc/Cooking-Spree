@@ -17,7 +17,7 @@
 - [x] 0B — Signed-out and unavailable-cloud safety. Evidence: focused tests plus the API 36 signed-out/airplane-mode launch, settings restart, and natural game-over run recorded in [development verification](../docs/development.md#current-verified-build-state).
 - [x] 0C — Single session, cancellation, and render/input teardown. Evidence: focused unit/device lifecycle checks and five repeated actual surface cycles passed; see [runtime architecture verification](../docs/architecture.md#concurrency-boundaries).
 - [x] 0D — Consistent pause and tutorial lifecycle. Evidence: focused unit tests and the API 36 8/8 connected suite passed on 2026-10-04, including independent pause reasons, tutorial movement-only allowance, manual/background resume behavior, and a 10-second active cook/fetch pause; labelled device screenshots were captured for the PR.
-- [x] 0E — Versioned, verified saves and atomic loading. Evidence: the ADR 0007 amendment passed 32 unit tests and the API 36 17/17 connected suite on 2026-10-05; three touch-visible recordings cover verified save/load, incompatible-version rejection, and same-version corruption rejection.
+- [ ] 0E — Versioned, verified saves and atomic loading. The owner-required two-slot amendment passes 32/32 unit tests and the API 36 18/18 connected suite; its concise updated recording is captured and awaits PR upload.
 - [ ] 0F — Integration evidence and delivery.
 - [ ] Owner approves and merges each Phase 0 PR.
 - [ ] Owner approves Phase 0 closeout after all delivery-map PRs are merged and the phase evidence is complete.
@@ -170,6 +170,18 @@ The owner superseded the unversioned legacy-load policy on 2026-10-05. Preserve 
 - [x] Update ADR 0003/0007, persistence, gameplay, architecture, development evidence, and PR #6's walkthrough/changelog/limitations. Evidence: [the PR walkthrough and three touch-visible recordings](https://github.com/matthew-ngzc/Cooking-Spree/pull/6#issuecomment-5984271004) identify the `Medium_Phone_API_36` API 36 emulator and cover successful save/load, incompatible-version rejection, and same-version corruption rejection.
 
 - [x] **Amended 0E gate:** `Game saved` is shown only after stored readback passes; that same-major snapshot resumes from its committed tile with orders/items/pots intact. Incompatible and corrupt saves show distinct errors, are cleared after acknowledgment, and never expose a fresh or partially restored session. Terminal state finalizes once; valid off-order dishes and `Waste` round-trip. Evidence: 32 unit tests, the API 36 17/17 connected suite, current owning docs, and the linked touch-visible PR recordings/walkthrough.
+
+### 0E two-slot amendment — failed attempts have no effect
+
+- [x] Owner selects two-slot promotion: the active save payload must never be overwritten by an attempted save. A failed attempt means that the previous save remains available exactly as it was; a failed first attempt creates no save.
+- [x] Stage each candidate in the inactive A/B slot, synchronously read back and fully validate it, then promote only the small active-slot selector. Do not use active-payload rollback as normal recovery.
+- [x] Keep a pre-two-slot versioned `GameSave` loadable as the compatibility source until successful slot adoption; clear the compatibility source, both slots, and selector when a run is rejected, completed, or cleared.
+- [x] Route menu save discovery and gameplay loading through the active-save API. Report either **Save failed. Your previous save is still available.** or **Save failed. No save was created.**
+- [x] Add deterministic regressions for first save, legacy adoption, alternating successes, candidate verification/write failure, selector-promotion failure, unchanged prior payload, prior-save loadability, and clearing. Evidence: instrumentation source compiles in `assembleDebugAndroidTest`; device execution is pending.
+- [ ] Update ADR 0007, persistence documentation, the plan, and the PR walkthrough so no rollback claim remains current. The repository documents are updated; the PR walkthrough remains pending.
+- [x] Run the complete API 34+ connected suite. Evidence: `testDebugUnitTest assembleDebug assembleDebugAndroidTest` passed with 32/32 unit tests, and `connectedDebugAndroidTest` passed 18/18 on `Medium_Phone_API_36` (`emulator-5554`, API 36) on 2026-10-05.
+- [x] Capture a concise touch-visible failed-save/previous-load recording. Evidence: a six-second trimmed API 36 recording shows **Save failed. Your previous save is still available**, the menu transition, the Load Game input, and restoration of score `111`; PR upload is pending.
+- [ ] **Two-slot ready gate:** automated and device evidence demonstrates that every failed attempt leaves the former active payload unchanged and loadable, successful saves alternate/promote only after verification, legacy adoption works, all stores clear together, and the PR documentation/evidence is current.
 
 ## 0F — integration evidence and delivery
 
