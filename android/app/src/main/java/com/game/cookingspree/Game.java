@@ -37,16 +37,22 @@ public class Game {
     private final PlayerInventory playerInventory;
     private final PotThreadPool potThreadPool;
     private final BasketManager basketManager;
+    private final PotFunctions.PotListener potListener;
 
-public Game(GameView gameView, Context context, PlayerInventory playerInventory,PotThreadPool potThreadPool,BasketManager basketManager) {
+public Game(GameView gameView, Context context, PlayerInventory playerInventory,PotThreadPool potThreadPool,BasketManager basketManager, PotFunctions.PotListener potListener) {
     this.gameView = gameView;
     this.context = context;
     this.playerInventory = playerInventory;
     this.potThreadPool=potThreadPool;
     this.basketManager=basketManager;
+    this.potListener=potListener;
 
     playerBitmap = BitmapFactory.decodeResource(context.getResources(), R.drawable.player);
     loadMapFromJson(); // also handles creation of player
+}
+
+public Game(GameView gameView, Context context, PlayerInventory playerInventory, PotThreadPool potThreadPool, BasketManager basketManager) {
+    this(gameView, context, playerInventory, potThreadPool, basketManager, null);
 }
     private void loadMapFromJson() {
         String TAG = "Map";
@@ -130,7 +136,7 @@ public Game(GameView gameView, Context context, PlayerInventory playerInventory,
 
                         switch (type) {
                             case "pot":
-                                Pot pot=new Pot(context,x,y,props,potThreadPool);
+                                Pot pot=new Pot(context,x,y,props,potThreadPool,potListener);
                                 interactable.add(pot);
                                 pots.add(pot);//To assist in saving their contents
                                 break;
@@ -197,12 +203,12 @@ public Game(GameView gameView, Context context, PlayerInventory playerInventory,
             }
 
             //draw player
-            player.draw(canvas, paint, TILE_SIZE);
+            if (player != null) player.draw(canvas, paint, TILE_SIZE);
         });
     }
 
     public void update() {
-        player.update();
+        if (player != null) player.update();
     }
 
     public long getSleepTime() {

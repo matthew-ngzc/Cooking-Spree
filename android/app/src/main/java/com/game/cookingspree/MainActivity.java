@@ -19,11 +19,9 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.game.cookingspree.util.PrefsHelper;
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 
-import java.util.Map;
 
 public class MainActivity extends BaseActivity {
 
@@ -48,12 +46,7 @@ public class MainActivity extends BaseActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         PrefsHelper.setSyncedThisSession(false);
-        if (FirebaseAuth.getInstance().getCurrentUser() != null && !PrefsHelper.hasSyncedThisSession()) {
-            new AccountManager(this).syncFromFirestoreToPrefs(() -> {
-                PrefsHelper.setSyncedThisSession(true);
-                setupSignInUI(); // or refresh just the name
-            });
-        }
+        accountManager = new AccountManager(this);
 
         //sharedPreferences = getSharedPreferences("AppSettings", MODE_PRIVATE);
         setContentView(R.layout.activity_main);
@@ -71,6 +64,7 @@ public class MainActivity extends BaseActivity {
         //audio setup
         mediaPlayer = setupMediaPlayer(R.raw.overcooked);
         setupVolumeSeekBar(findViewById(R.id.volumeSeekBar), mediaPlayer);
+        setupMenuJoystickSelection();
 
         //load high score
         highScoreTextView = findViewById(R.id.highScore1);
@@ -79,15 +73,17 @@ public class MainActivity extends BaseActivity {
         //enable immersive UI
         enableImmersiveMode();
 
-        //Google sign in
-        Log.d("PrefsDump", "=== BEGIN PREF DUMP ===");
-        Map<String, ?> allPrefs = PrefsHelper.getAll();
-        for (Map.Entry<String, ?> entry : allPrefs.entrySet()) {
-            Log.d("PrefsDump", entry.getKey() + " = " + entry.getValue());
-        }
-        Log.d("PrefsDump", "=== END PREF DUMP ===");
-        accountManager = new AccountManager(this);
+        // Google sign in remains owned by this activity. Cache hydration is local-only.
         setupSignInUI();
+        if (accountManager.getCurrentUser() != null && !PrefsHelper.hasSyncedThisSession()) {
+            accountManager.syncFromFirestoreToPrefs(() -> {
+                PrefsHelper.setSyncedThisSession(true);
+                runOnUiThread(() -> {
+                    setupSignInUI();
+                    setupMenuJoystickSelection();
+                });
+            });
+        }
 
         //link buttons and views
         startGameButton = findViewById(R.id.StartGame);
@@ -119,6 +115,10 @@ public class MainActivity extends BaseActivity {
         Log.d("SignInDebug", "onStart() triggered");
         setupSignInUI();
         Log.d("SignInDebug", "onStart() completed");
+    }
+
+    private void setupMenuJoystickSelection() {
+        setupJoystickSizeListener(findViewById(R.id.joystickSizeGroup), R.id.smallSize, R.id.largeSize, null);
     }
 
 
@@ -163,21 +163,29 @@ public class MainActivity extends BaseActivity {
         String cachedChefName = PrefsHelper.getChefName();
         if (cachedChefName != null) {
             chefNameText.setText(getString(R.string.chef_greeting, cachedChefName));
-            Log.d("Prefs_debug MainActivity", "chefName = " + cachedChefName);
             return;
         }
-        Log.d("Prefs_debug MainActivity", "no chef in prefs");
         // shared preferences no name, check firebase
-        FirebaseFirestore.getInstance()
-            .collection("chefs")
-            .document(uid)
-            .get()
-            .addOnSuccessListener(doc -> {
-                String chefName = doc.getString("chefName");
-                chefNameText.setText(getString(R.string.chef_greeting, chefName));
-                PrefsHelper.setChefName(chefName);
-            })
-            .addOnFailureListener(e -> chefNameText.setText(R.string.welcome));
+        try {
+            FirebaseFirestore.getInstance()
+                .collection("chefs")
+                .document(uid)
+                .get()
+                .addOnSuccessListener(doc -> {
+                    String chefName = doc.getString("chefName");
+                    if (chefName != null) {
+                        PrefsHelper.setChefName(chefName);
+                        chefNameText.setText(getString(R.string.chef_greeting, chefName));
+                    } else chefNameText.setText(R.string.welcome);
+                })
+                .addOnFailureListener(e -> {
+                    Log.w("MainActivity", "Chef profile fetch failed (" + e.getClass().getSimpleName() + ")");
+                    chefNameText.setText(R.string.welcome);
+                });
+        } catch (RuntimeException failure) {
+            Log.w("MainActivity", "Chef profile unavailable (" + failure.getClass().getSimpleName() + ")");
+            chefNameText.setText(R.string.welcome);
+        }
     }
 
     private void loadHighScore() {

@@ -1,6 +1,7 @@
 package com.game.cookingspree;
 
 import android.app.Activity;
+import android.content.Context;
 
 import android.os.Bundle;
 import android.util.Log;
@@ -10,12 +11,14 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 
 import com.game.cookingspree.util.PrefsHelper;
+import com.game.cookingspree.util.LocalFirstWrite;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
 import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.*;
@@ -47,17 +50,51 @@ public class AccountManager {
 
     public AccountManager(Activity activity) {
         this.activity = activity;
-        FirebaseApp.initializeApp(activity);
-        this.auth = FirebaseAuth.getInstance();
-        this.db = FirebaseFirestore.getInstance();
-        this.credentialManager = CredentialManager.create(activity);
+        FirebaseAuth initializedAuth = null;
+        FirebaseFirestore initializedDb = null;
+        CredentialManager initializedCredentials = null;
+        try {
+            FirebaseApp.initializeApp(activity.getApplicationContext());
+            initializedAuth = FirebaseAuth.getInstance();
+            initializedDb = FirebaseFirestore.getInstance();
+            initializedCredentials = CredentialManager.create(activity);
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "Account services unavailable (" + failure.getClass().getSimpleName() + ")");
+        }
+        this.auth = initializedAuth;
+        this.db = initializedDb;
+        this.credentialManager = initializedCredentials;
+    }
+
+    /** Activity-free adapter retained by PrefsHelper for optional asynchronous writes. */
+    public static PrefsHelper.SyncAdapter createSyncAdapter(Context context) {
+        FirebaseApp.initializeApp(context.getApplicationContext());
+        FirebaseAuth syncAuth = FirebaseAuth.getInstance();
+        FirebaseFirestore syncDb = FirebaseFirestore.getInstance();
+        return new PrefsHelper.SyncAdapter() {
+            private void update(String section, String key, Object value) {
+                updateCloudField(syncAuth, syncDb, section, key, value);
+            }
+
+            @Override public void updateSetting(String key, Object value) { update("settings", key, value); }
+            @Override public void updateStat(String key, Object value) { update("stats", key, value); }
+            @Override public void updateProfileField(String key, Object value) { update("profile", key, value); }
+        };
+    }
+
+    private static void reportSyncFailure(Exception error) {
+        Log.w("AccountSync", "Cloud write failed (" + error.getClass().getSimpleName() + ")");
     }
 
     public FirebaseUser getCurrentUser() {
-        return auth.getCurrentUser();
+        return auth == null ? null : auth.getCurrentUser();
     }
 
     public void signIn(Runnable onSuccess) {
+        if (credentialManager == null || auth == null || db == null) {
+            Toast.makeText(activity, "Sign-in is unavailable", Toast.LENGTH_SHORT).show();
+            return;
+        }
         Log.d("AccountManager", "signIn() called");
         // clear credentials first then sign in to new account
         clearCredentials(() -> startSignInFlow(onSuccess));
@@ -140,7 +177,8 @@ public class AccountManager {
                             });
                         });
                     } else {
-                        Log.e(TAG, "Firebase sign-in failed", task.getException());
+                        Exception error = task.getException();
+                        Log.w(TAG, "Firebase sign-in failed (" + (error == null ? "unknown" : error.getClass().getSimpleName()) + ")");
                     }
                 });
     }
@@ -259,77 +297,94 @@ Each chef document is organized into nested maps for modularity, clarity, and sc
     // run on app start
     public void syncFromFirestoreToPrefs(Runnable onDone) {
         FirebaseUser user = getCurrentUser();
-        if (user == null) {
+        if (user == null || db == null) {
             if (onDone != null) onDone.run();
             return;
         }
 
-        db.collection("chefs").document(user.getUid()).get().addOnSuccessListener(doc -> {
-            if (doc.exists()) {
-                // Profile
-                Map<String, Object> profile = (Map<String, Object>) doc.get("profile");
-                if (profile != null) {
-                    Object name = profile.get("chefName");
-                    if (name != null) {
-                        PrefsHelper.setChefName(name.toString());
-                        Log.d("Prefs_debug AccM", "chefName is " + name.toString());
-                    }else{
-                        Log.d("Prefs_debug AccM", "chefName is null from firebase");
-                    }
-                    Number streak = (Number) profile.get("dailyStreak");
-                    if (streak != null) PrefsHelper.setDailyStreak(streak.intValue());
-                    if (profile.get("chefCode") != null)
-                        PrefsHelper.setChefCode(Objects.requireNonNull(profile.get("chefCode")).toString());
-
-                    if (profile.get("photoUrl") != null)
-                        PrefsHelper.setPhotoUrl(Objects.requireNonNull(profile.get("photoUrl")).toString());
-                    }
-
-                // Stats
-                Map<String, Object> stats = (Map<String, Object>) doc.get("stats");
-                if (stats != null) {
-                    Number gamesPlayed = (Number) stats.get("gamesPlayed");
-                    Number highScore = (Number) stats.get("highScore");
-                    Number averageScore = (Number) stats.get("averageScore");
-
-                    if (gamesPlayed != null) PrefsHelper.setGamesPlayed(gamesPlayed.intValue());
-                    if (highScore != null) PrefsHelper.setHighScore(highScore.intValue());
-                    if (averageScore != null) PrefsHelper.setAverageScore(averageScore.floatValue());
+        try {
+            db.collection("chefs").document(user.getUid()).get().addOnSuccessListener(doc -> {
+                try {
+                    PrefsHelper.withoutCloudSync(() -> applySyncedDocument(doc));
+                } catch (RuntimeException failure) {
+                    reportSyncFailure(failure);
                 }
-
-                // Settings
-                Map<String, Object> settings = (Map<String, Object>) doc.get("settings");
-                if (settings != null) {
-                    Object scale = settings.get("joystickScale");
-                    Object volume = settings.get("volume");
-                    String lang = (String) settings.get("language");
-                    if (lang != null) PrefsHelper.setLanguage(lang);
-
-                    if (scale instanceof Float) PrefsHelper.setJoystickScale((float) scale);
-                    if (volume instanceof Number) PrefsHelper.setVolume(((Number) volume).intValue());
-                }
-            }
+                if (onDone != null) onDone.run();
+            }).addOnFailureListener(error -> {
+                reportSyncFailure(error);
+                if (onDone != null) onDone.run();
+            });
+        } catch (RuntimeException failure) {
+            reportSyncFailure(failure);
             if (onDone != null) onDone.run();
-        })
-                .addOnFailureListener(e -> {
-                    Log.e("Prefs_debug AccM", "Failed to fetch Firestore", e);
-                    if (onDone != null) onDone.run();
-                });
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void applySyncedDocument(DocumentSnapshot doc) {
+        if (!doc.exists()) return;
+
+        Map<String, Object> profile = (Map<String, Object>) doc.get("profile");
+        if (profile != null) {
+            Object name = profile.get("chefName");
+            if (name != null) PrefsHelper.setChefName(name.toString());
+            Number streak = (Number) profile.get("dailyStreak");
+            if (streak != null) PrefsHelper.setDailyStreak(streak.intValue());
+            if (profile.get("chefCode") != null)
+                PrefsHelper.setChefCode(Objects.requireNonNull(profile.get("chefCode")).toString());
+            if (profile.get("photoUrl") != null)
+                PrefsHelper.setPhotoUrl(Objects.requireNonNull(profile.get("photoUrl")).toString());
+        }
+
+        Map<String, Object> stats = (Map<String, Object>) doc.get("stats");
+        if (stats != null) {
+            Number gamesPlayed = (Number) stats.get("gamesPlayed");
+            Number highScore = (Number) stats.get("highScore");
+            Number averageScore = (Number) stats.get("averageScore");
+            if (gamesPlayed != null) PrefsHelper.setGamesPlayed(gamesPlayed.intValue());
+            if (highScore != null) PrefsHelper.setHighScore(highScore.intValue());
+            if (averageScore != null) PrefsHelper.setAverageScore(averageScore.floatValue());
+        }
+
+        Map<String, Object> settings = (Map<String, Object>) doc.get("settings");
+        if (settings != null) {
+            Object scale = settings.get("joystickScale");
+            Object volume = settings.get("volume");
+            String lang = (String) settings.get("language");
+            if (lang != null) PrefsHelper.setLanguage(lang);
+            if (scale instanceof Number) PrefsHelper.setJoystickScale(((Number) scale).floatValue());
+            if (volume instanceof Number) PrefsHelper.setVolume(((Number) volume).intValue());
+        }
     }
 
     public void updateSetting(String key, Object value) {
-        db.collection("chefs").document(getCurrentUser().getUid())
-                .update("settings." + key, value);
+        updateCloudField("settings", key, value);
     }
 
     public void updateStat(String key, Object value) {
-        db.collection("chefs").document(getCurrentUser().getUid())
-                .update("stats." + key, value);
+        updateCloudField("stats", key, value);
     }
 
     public void updateProfileField(String key, Object value) {
-        db.collection("chefs").document(getCurrentUser().getUid())
-                .update("profile." + key, value);
+        updateCloudField("profile", key, value);
+    }
+
+    private void updateCloudField(String section, String key, Object value) {
+        updateCloudField(auth, db, section, key, value);
+    }
+
+    private static void updateCloudField(FirebaseAuth auth, FirebaseFirestore db,
+                                         String section, String key, Object value) {
+        if (auth == null || db == null) return;
+        LocalFirstWrite.ifPresent(auth::getCurrentUser, user -> {
+            try {
+                db.collection("chefs").document(user.getUid())
+                        .update(section + "." + key, value)
+                        .addOnFailureListener(AccountManager::reportSyncFailure);
+            } catch (RuntimeException failure) {
+                reportSyncFailure(failure);
+            }
+        });
     }
 
 

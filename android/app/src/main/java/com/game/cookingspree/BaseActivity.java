@@ -7,7 +7,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
-import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.SeekBar;
 
@@ -16,6 +15,7 @@ import java.util.function.Consumer;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.game.cookingspree.util.PrefsHelper;
+import com.game.cookingspree.util.JoystickSelection;
 
 
 public abstract class BaseActivity extends AppCompatActivity {
@@ -29,8 +29,15 @@ public abstract class BaseActivity extends AppCompatActivity {
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Initialize preferences
-        PrefsHelper.init(this, new AccountManager(this));
+        // Initialize local preferences even when Firebase is unavailable. The retained sync adapter
+        // is Activity-free; credential UI is created by the owning activity when needed.
+        PrefsHelper.SyncAdapter syncAdapter = null;
+        try {
+            syncAdapter = AccountManager.createSyncAdapter(getApplicationContext());
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "Cloud sync unavailable during initialization (" + failure.getClass().getSimpleName() + ")");
+        }
+        PrefsHelper.init(getApplicationContext(), syncAdapter);
 
     }
 
@@ -46,22 +53,13 @@ public abstract class BaseActivity extends AppCompatActivity {
 //    }
 
     protected void setupJoystickSizeListener(RadioGroup group, int smallId, int largeId, Consumer<Float> onChange) {
-//        float savedScale = getSavedJoystickScale();
         float savedScale = PrefsHelper.getJoystickScale();
-        group.post(() -> {
-            if (savedScale == JOYSTICK_SCALE_LARGE && group.findViewById(largeId) != null) {
-                ((RadioButton) group.findViewById(largeId)).setChecked(true);
-            } else ((RadioButton) group.findViewById(smallId)).setChecked(true);
-        });
-
-        group.setOnCheckedChangeListener((radioGroup, checkedId) -> {
-            float selectedScale = (checkedId == smallId) ? JOYSTICK_SCALE_SMALL : JOYSTICK_SCALE_LARGE;
-            //saveJoystickScale(selectedScale);
-            PrefsHelper.setJoystickScale(selectedScale);
-            if (onChange != null) {
-                onChange.accept(selectedScale); // Apply immediately if callback provided
-            }
-        });
+        JoystickSelection.hydrate(savedScale, JOYSTICK_SCALE_LARGE, smallId, largeId,
+                id -> group.check(id), () -> group.setOnCheckedChangeListener((radioGroup, checkedId) -> {
+                    float selectedScale = (checkedId == smallId) ? JOYSTICK_SCALE_SMALL : JOYSTICK_SCALE_LARGE;
+                    PrefsHelper.setJoystickScale(selectedScale);
+                    if (onChange != null) onChange.accept(selectedScale);
+                }));
     }
     protected void applyJoystickScale(View rootView) {
         //float scale = getSavedJoystickScale();

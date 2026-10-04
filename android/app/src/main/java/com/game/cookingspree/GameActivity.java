@@ -27,7 +27,9 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.game.cookingspree.util.PrefsHelper;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class GameActivity extends BaseActivity implements
         GameManager.GameListener,
@@ -37,7 +39,10 @@ public class GameActivity extends BaseActivity implements
         {
 
     private final Handler moveHandler = new Handler(Looper.getMainLooper());
-    private Runnable moveRunnable;
+    private final Map<View, Runnable> heldMovementCallbacks = new HashMap<>();
+    private final HeldDirections heldDirections = new HeldDirections();
+    private final SessionCallbacks sessionCallbacks = new SessionCallbacks();
+    private final SessionComposer sessionComposer = new SessionComposer();
     protected MediaPlayer mediaPlayer;
     protected GameManager gameManager;
     private OrderAdapter orderAdapter;
@@ -61,11 +66,13 @@ public class GameActivity extends BaseActivity implements
     //private SharedPreferences sharedPreferences;
     private BasketManager basketManager;
 
+    protected int getGameLayoutResource() { return R.layout.activity_game; }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         try {
-            setContentView(R.layout.activity_game);
+            setContentView(getGameLayoutResource());
             //sharedPreferences = getSharedPreferences("AppSettings", MODE_PRIVATE);
             setupJoystickSizeListener(
                     findViewById(R.id.joystickSizeGroup),
@@ -506,6 +513,7 @@ public class GameActivity extends BaseActivity implements
                     // Restart cooking using cookRecipe and progress
                     potThreadPool.submit(() -> {
                         potFunctions.restartCooking(resumeRecipe, this);
+                        if (Thread.currentThread().isInterrupted() || !sessionCallbacks.isOpen()) return;
                         //Set pot state
                         pot.setState(Pot.State.DONE.name());
                         Log.d(TAG,"Finished cooking recipe");
@@ -526,6 +534,36 @@ public class GameActivity extends BaseActivity implements
         }
     }
     protected void initializeGameComponents() {
+        sessionComposer.composeOnce(this::composeGameComponents);
+    }
+
+    int getSessionCompositionCountForTest() { return sessionComposer.getCompositionCount(); }
+
+    IngredientFetchWorker getIngredientFetcherForTest() { return ingredientFetcher; }
+    PotThreadPool getPotThreadPoolForTest() { return potThreadPool; }
+    GameView getGameViewForTest() { return findViewById(R.id.gameView); }
+    int getDeliveredSessionCallbacksForTest() { return sessionCallbacks.deliveredCount(); }
+
+    Pot startCookForTest() {
+        Pot pot = game.getPots().get(0);
+        Recipe recipe = Recipe.getDefaultRecipes().get(0);
+        for (Ingredient ingredient : recipe.getIngredients()) pot.getPotFunctions().addIngredient(ingredient);
+        pot.setState(Pot.State.COOKING.name());
+        potThreadPool.submit(() -> {
+            pot.getPotFunctions().cookIngredients(recipe, this);
+            if (Thread.currentThread().isInterrupted()) return;
+            pot.setState(Pot.State.DONE.name());
+        });
+        return pot;
+    }
+
+    void startFetchForTest() {
+        List<Ingredient> used = ingredientFetcher.getUsedListForTest();
+        List<Ingredient> available = ingredientFetcher.getAvailableList();
+        ingredientFetcher.exchangeIngredient(used.get(0), available.get(0), this);
+    }
+
+    private void composeGameComponents() {
         GameView gameView = findViewById(R.id.gameView);
 
         List<Recipe> recipeList=Recipe.getDefaultRecipes();
@@ -533,7 +571,7 @@ public class GameActivity extends BaseActivity implements
         basketManager = new BasketManager(maxIngredients);
         int maxPots = 2;
         potThreadPool = new PotThreadPool(maxPots);
-        game = new Game(gameView, this, playerInventory,potThreadPool,basketManager);
+        game = new Game(gameView, this, playerInventory,potThreadPool,basketManager,this);
         gameView.init(game);
 
         setupMovementControls();
@@ -567,23 +605,30 @@ public class GameActivity extends BaseActivity implements
 
     private void setupHoldMovement(View button, Runnable movementAction) {
         button.setOnTouchListener((v, event) -> {
+            int direction = v.getId();
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
                     v.performClick();
-                    moveRunnable = new Runnable() {
+                    if (heldMovementCallbacks.containsKey(v)) return true;
+                    heldDirections.press(direction);
+                    Runnable movementRunnable = new Runnable() {
                         @Override
                         public void run() {
+                            if (!sessionCallbacks.isOpen() || !heldDirections.isHeld(direction)) return;
                             movementAction.run();
-                            moveHandler.postDelayed(this, 150);
+                            if (heldDirections.isHeld(direction)) moveHandler.postDelayed(this, 150);
                         }
                     };
-                    moveRunnable.run();
+                    heldMovementCallbacks.put(v, movementRunnable);
+                    movementRunnable.run();
                     return true;
 
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
-                    moveHandler.removeCallbacks(moveRunnable);
-                    game.getPlayer().stopMovement();
+                    Runnable callback = heldMovementCallbacks.remove(v);
+                    if (callback != null) moveHandler.removeCallbacks(callback);
+                    boolean anotherDirectionHeld = heldDirections.release(direction);
+                    if (!anotherDirectionHeld && game != null && game.getPlayer() != null) game.getPlayer().stopMovement();
                     return true;
             }
             return false;
@@ -921,13 +966,13 @@ public class GameActivity extends BaseActivity implements
     @Override
     public void fetchIngredientProgressUpdate(int progress){
         //Add progress updater for ingredient fetch
-        runOnUiThread(() -> Log.d(TAG,"Received progress update for ingredient:"+progress));
+        postSessionUi(() -> Log.d(TAG,"Received progress update for ingredient:"+progress));
     }
 
     @Override
     public void finishedBasketFilling(List<Ingredient> fillOrder){
         //Listener to update ui when baskets are changed
-        runOnUiThread(() -> {
+        postSessionUi(() -> {
             try {
                 updateAvailableUI();
                 updateInventoryUI(fillOrder);
@@ -956,7 +1001,7 @@ public class GameActivity extends BaseActivity implements
     @Override
     public void potProgressUpdate(int progress){
         //Add progress updates for pot
-        runOnUiThread(() -> Log.d(TAG,"Received progress update for pot:"+progress));
+        postSessionUi(() -> Log.d(TAG,"Received progress update for pot:"+progress));
     }
 
     private void resetSelectionState() {
@@ -993,6 +1038,7 @@ public class GameActivity extends BaseActivity implements
 
     @Override
     protected void onPause() {
+        cancelHeldMovement();
         super.onPause();
         try {
             if (gameManager != null) {
@@ -1028,12 +1074,24 @@ public class GameActivity extends BaseActivity implements
     }
 
     @Override
+    protected void onStop() {
+        cancelHeldMovement();
+        super.onStop();
+    }
+
+    @Override
     protected void onDestroy() {
+        sessionCallbacks.close();
+        cancelHeldMovement();
         super.onDestroy();
         try {
             if (gameManager != null) {
                 gameManager.stopGame();
             }
+            if (ingredientFetcher != null) ingredientFetcher.close();
+            if (potThreadPool != null) potThreadPool.close();
+            GameView gameView = findViewById(R.id.gameView);
+            if (gameView != null) gameView.shutdown();
 
             if (mediaPlayer != null) {
                 mediaPlayer.release();
@@ -1088,7 +1146,7 @@ public class GameActivity extends BaseActivity implements
     // GameManager.GameListener implementation
     @Override
     public void onTimerTick() {
-        runOnUiThread(() -> {
+        postSessionUi(() -> {
             try {
                 if (gameManager != null && orderAdapter != null) {
                     updatePlayerInventoryView();
@@ -1102,7 +1160,7 @@ public class GameActivity extends BaseActivity implements
 
     @Override
     public void onProcessAdded(Order order) {
-        runOnUiThread(() -> {
+        postSessionUi(() -> {
             try {
                 if (orderAdapter != null && gameManager != null) {
                     orderAdapter.updateProcesses(gameManager.getActiveProcesses());
@@ -1115,7 +1173,7 @@ public class GameActivity extends BaseActivity implements
 
     @Override
     public void onProcessCompleted(Order order) {
-        runOnUiThread(() -> {
+        postSessionUi(() -> {
             try {
                 if (orderAdapter != null && gameManager != null) {
                     orderAdapter.updateProcesses(gameManager.getActiveProcesses());
@@ -1128,7 +1186,7 @@ public class GameActivity extends BaseActivity implements
 
     @Override
     public void onProcessDied(Order order) {
-        runOnUiThread(() -> {
+        postSessionUi(() -> {
             if (orderAdapter != null && gameManager != null) {
                 orderAdapter.updateProcesses(gameManager.getActiveProcesses());
                 updateDeadProcessCountDisplay(gameManager.getDeadProcessCount());
@@ -1139,7 +1197,7 @@ public class GameActivity extends BaseActivity implements
 
     @Override
     public void onScoreChanged(int newScore) {
-        runOnUiThread(() -> {
+        postSessionUi(() -> {
             try {
                 updateScoreDisplay(newScore);
             } catch (Exception e) {
@@ -1150,32 +1208,29 @@ public class GameActivity extends BaseActivity implements
 
     @Override
     public void onGameOver(int finalScore) {
-        runOnUiThread(() -> {
+        postSessionUi(() -> {
+            GameOverPersistence.complete(finalScore, new GameOverPersistence.StatsStore() {
+                @Override public int getHighScore() { return PrefsHelper.getHighScore(); }
+                @Override public int getGamesPlayed() { return PrefsHelper.getGamesPlayed(); }
+                @Override public float getAverageScore() { return PrefsHelper.getAverageScore(); }
+                @Override public void setHighScore(int score) { PrefsHelper.setHighScore(score); }
+                @Override public void setAverageScore(float score) { PrefsHelper.setAverageScore(score); }
+                @Override public void setGamesPlayed(int count) { PrefsHelper.setGamesPlayed(count); }
+            }, PrefsHelper::clearSaveState);
             GameOverDialog gameOverDialog = new GameOverDialog(this, finalScore);
             gameOverDialog.show();
-            saveHighScore(finalScore);
-            updateAverageScoreAndGamesPlayed(finalScore);
-            PrefsHelper.clearSaveState();
         });
     }
 
-
-
-    private void saveHighScore(int score) {
-        int highScore = PrefsHelper.getHighScore();
-        if (score > highScore) {
-            PrefsHelper.setHighScore(score);
-        }
+    private void cancelHeldMovement() {
+        for (Runnable callback : heldMovementCallbacks.values()) moveHandler.removeCallbacks(callback);
+        heldMovementCallbacks.clear();
+        heldDirections.clear();
+        if (game != null && game.getPlayer() != null) game.getPlayer().stopMovement();
     }
-    public static void updateAverageScoreAndGamesPlayed(int score){
-        int gamesPlayed = PrefsHelper.getGamesPlayed();
-        float currentAveScore = PrefsHelper.getAverageScore();
-        float totalScore = gamesPlayed * currentAveScore + score;
-        gamesPlayed++;
-        float newAve =  totalScore / gamesPlayed;
-        // update average
-        PrefsHelper.setAverageScore(newAve);
-        //update games played
-        PrefsHelper.setGamesPlayed(gamesPlayed);
+
+    private void postSessionUi(Runnable callback) {
+        if (!sessionCallbacks.isOpen()) return;
+        runOnUiThread(() -> sessionCallbacks.runIfOpen(callback));
     }
 }

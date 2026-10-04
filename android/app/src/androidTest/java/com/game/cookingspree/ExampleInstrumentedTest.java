@@ -1,6 +1,10 @@
 package com.game.cookingspree;
 
 import android.content.Context;
+import android.content.Intent;
+import android.app.Activity;
+import android.os.SystemClock;
+import android.view.ViewGroup;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -21,6 +25,173 @@ public class ExampleInstrumentedTest {
     public void useAppContext() {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        assertEquals("com.example.com.game.com.game.cookingspree", appContext.getPackageName());
+        assertEquals("com.game.cookingspree", appContext.getPackageName());
+    }
+
+    @Test
+    public void tutorialEntryComposesOneSessionAndClosesOnRepeatedExit() {
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        Context appContext = instrumentation.getTargetContext();
+        for (int attempt = 0; attempt < 2; attempt++) {
+            Intent intent = new Intent(appContext, TutorialActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            Activity launched = instrumentation.startActivitySync(intent);
+            assertTrue(launched instanceof TutorialActivity);
+            GameActivity tutorial = (GameActivity) launched;
+            assertEquals(1, tutorial.getSessionCompositionCountForTest());
+            assertNotNull(tutorial.game);
+            assertNotNull(tutorial.gameManager);
+            GameManager manager = tutorial.gameManager;
+
+            instrumentation.runOnMainSync(tutorial::finish);
+            instrumentation.waitForIdleSync();
+            long deadline = SystemClock.elapsedRealtime() + 5_000;
+            while (!manager.isClosed() && SystemClock.elapsedRealtime() < deadline) {
+                SystemClock.sleep(50);
+            }
+            assertTrue("manager should close after tutorial exit", manager.isClosed());
+        }
+    }
+
+    @Test
+    public void gameExitDuringActiveFetchClosesOwnersWithoutLateMutationOrCallback() {
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        GameActivity activity = launchGame(instrumentation);
+        GameManager manager = activity.gameManager;
+        IngredientFetchWorker fetcher = activity.getIngredientFetcherForTest();
+        PotThreadPool potPool = activity.getPotThreadPoolForTest();
+        java.util.List<Ingredient> availableBefore = fetcher.getAvailableList();
+        java.util.List<Ingredient> usedBefore = fetcher.getUsedListForTest();
+        java.util.List<String> processesBefore = processSnapshot(manager);
+
+        instrumentation.runOnMainSync(activity::startFetchForTest);
+        await(() -> fetcher.isFetchingForTest(), 2_000, "ingredient fetch did not start");
+        instrumentation.runOnMainSync(activity::finish);
+        await(() -> manager.isClosed() && fetcher.isClosed() && potPool.isClosed(),
+                5_000, "activity owners did not close within the bound");
+        int callbacksAtClose = activity.getDeliveredSessionCallbacksForTest();
+
+        // Wait past both the fetch duration and the manager's maximum 13-second spawn delay.
+        SystemClock.sleep(13_300);
+        assertEquals(availableBefore, fetcher.getAvailableList());
+        assertEquals(usedBefore, fetcher.getUsedListForTest());
+        assertEquals(processesBefore, processSnapshot(manager));
+        assertEquals(callbacksAtClose, activity.getDeliveredSessionCallbacksForTest());
+
+        GameActivity reentered = launchGame(instrumentation);
+        assertEquals(1, reentered.getSessionCompositionCountForTest());
+        finishAndAwaitClosed(instrumentation, reentered);
+    }
+
+    @Test
+    public void gameExitDuringActiveCookClosesOwnersWithoutLateFoodOrCallback() {
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        GameActivity activity = launchGame(instrumentation);
+        GameManager manager = activity.gameManager;
+        IngredientFetchWorker fetcher = activity.getIngredientFetcherForTest();
+        PotThreadPool potPool = activity.getPotThreadPoolForTest();
+        Pot pot = instrumentationCall(instrumentation, activity::startCookForTest);
+        await(() -> potPool.activeTaskCountForTest() == 1
+                        && pot.getPotFunctions().getRecipeCooking() != null,
+                2_000, "pot cook did not become active");
+        instrumentation.runOnMainSync(activity::finish);
+        await(() -> manager.isClosed() && fetcher.isClosed() && potPool.isClosed(),
+                5_000, "activity owners did not close within the bound");
+        int callbacksAtClose = activity.getDeliveredSessionCallbacksForTest();
+
+        // Pot cooking takes six seconds. Wait past completion to detect late food publication.
+        SystemClock.sleep(6_300);
+        assertFalse(pot.getPotFunctions().gotFood());
+        assertEquals(3, pot.getPotFunctions().getIngredientsInside().size());
+        assertEquals(Pot.State.COOKING.name(), pot.getState());
+        assertEquals(callbacksAtClose, activity.getDeliveredSessionCallbacksForTest());
+
+        GameActivity reentered = launchGame(instrumentation);
+        assertEquals(1, reentered.getSessionCompositionCountForTest());
+        finishAndAwaitClosed(instrumentation, reentered);
+    }
+
+    @Test
+    public void repeatedActualSurfaceDetachAndAttachKeepsOneRenderLoopAndBoundedExit() {
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        GameActivity activity = launchGame(instrumentation);
+        GameManager manager = activity.gameManager;
+        GameView gameView = activity.getGameViewForTest();
+        ViewGroup parent = (ViewGroup) gameView.getParent();
+        ViewGroup.LayoutParams layoutParams = gameView.getLayoutParams();
+        await(() -> gameView.activeRenderLoopsForTest() == 1
+                        && gameView.surfaceCreateCallbacksForTest() >= 1,
+                3_000, "initial surface render loop did not start");
+
+        for (int cycle = 0; cycle < 5; cycle++) {
+            int destroyedBefore = gameView.surfaceDestroyCallbacksForTest();
+            int startsBefore = gameView.renderLoopStartsForTest();
+            long destroyStart = SystemClock.elapsedRealtime();
+            instrumentation.runOnMainSync(() -> parent.removeView(gameView));
+            await(() -> gameView.surfaceDestroyCallbacksForTest() > destroyedBefore
+                            && gameView.activeRenderLoopsForTest() == 0,
+                    2_000, "surface destruction did not stop its render loop");
+            assertTrue("surface teardown exceeded the bounded allowance",
+                    SystemClock.elapsedRealtime() - destroyStart < 2_000);
+
+            int createsBefore = gameView.surfaceCreateCallbacksForTest();
+            instrumentation.runOnMainSync(() -> parent.addView(gameView, layoutParams));
+            await(() -> gameView.surfaceCreateCallbacksForTest() > createsBefore
+                            && gameView.renderLoopStartsForTest() > startsBefore
+                            && gameView.activeRenderLoopsForTest() == 1,
+                    3_000, "recreated surface did not start exactly one render loop");
+            assertEquals(1, gameView.maxConcurrentRenderLoopsForTest());
+        }
+
+        instrumentation.runOnMainSync(activity::finish);
+        await(() -> manager.isClosed() && gameView.activeRenderLoopsForTest() == 0
+                        && gameView.isPermanentlyClosedForTest(),
+                5_000, "activity render teardown did not finish within the bound");
+        assertEquals(1, gameView.maxConcurrentRenderLoopsForTest());
+    }
+
+    private static GameActivity launchGame(android.app.Instrumentation instrumentation) {
+        Intent intent = new Intent(instrumentation.getTargetContext(), GameActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        Activity launched = instrumentation.startActivitySync(intent);
+        assertTrue(launched instanceof GameActivity);
+        return (GameActivity) launched;
+    }
+
+    private static void finishAndAwaitClosed(android.app.Instrumentation instrumentation,
+                                             GameActivity activity) {
+        GameManager manager = activity.gameManager;
+        IngredientFetchWorker fetcher = activity.getIngredientFetcherForTest();
+        PotThreadPool potPool = activity.getPotThreadPoolForTest();
+        instrumentation.runOnMainSync(activity::finish);
+        await(() -> manager.isClosed() && fetcher.isClosed() && potPool.isClosed(),
+                5_000, "re-entered activity owners did not close within the bound");
+    }
+
+    private static java.util.List<String> processSnapshot(GameManager manager) {
+        java.util.List<String> result = new java.util.ArrayList<>();
+        for (Order order : manager.getActiveProcesses()) {
+            result.add(order.getId() + ":" + order.getTimeRemaining());
+        }
+        return result;
+    }
+
+    private static Pot instrumentationCall(android.app.Instrumentation instrumentation,
+                                            java.util.concurrent.Callable<Pot> action) {
+        java.util.concurrent.atomic.AtomicReference<Pot> result = new java.util.concurrent.atomic.AtomicReference<>();
+        instrumentation.runOnMainSync(() -> {
+            try { result.set(action.call()); }
+            catch (Exception e) { throw new AssertionError(e); }
+        });
+        return result.get();
+    }
+
+    private static void await(java.util.function.BooleanSupplier condition, long timeoutMs,
+                              String failureMessage) {
+        long deadline = SystemClock.elapsedRealtime() + timeoutMs;
+        while (!condition.getAsBoolean() && SystemClock.elapsedRealtime() < deadline) {
+            SystemClock.sleep(20);
+        }
+        assertTrue(failureMessage, condition.getAsBoolean());
     }
 }

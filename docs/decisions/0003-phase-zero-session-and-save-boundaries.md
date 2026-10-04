@@ -1,7 +1,8 @@
 # ADR 0003: Phase 0 session and save boundaries
 
-Status: Proposed
+Status: Accepted
 Date: 2026-10-01
+Accepted: 2026-10-04
 
 ## Context
 
@@ -9,7 +10,7 @@ The current offline baseline has duplicate tutorial sessions, unfinished worker 
 
 ## Decision
 
-Propose one activity-owned gameplay session with idempotent teardown and listeners that cannot mutate closed sessions. Preference storage/cloud-update ownership must not statically retain an Activity; credential UI remains activity-owned.
+Use one activity-owned gameplay session with idempotent teardown and listeners that cannot mutate closed sessions. Preference storage/cloud-update ownership must not statically retain an Activity; credential UI remains activity-owned.
 
 Track manual, background, and tutorial pause reasons separately. Any active reason freezes gameplay timers, movement/input, cooking, and ingredient exchange progress. Foregrounding removes only the background reason. Resume continues in-memory work; game over is terminal and finalizes statistics/save clearing once. The tutorial may explicitly permit its existing movement demonstration.
 
@@ -19,6 +20,6 @@ Do not add versioned schemas, stable map/recipe IDs, basket/fetch/streak continu
 
 ## Consequences
 
-The owner must accept these proposed behavior/architecture boundaries before dependent implementation. Small lifecycle, timing, sync, and snapshot seams are permitted; wholesale game-engine replacement is not. Pause becomes consistent across systems, and valid legacy saves remain readable within the current map/catalogue. Future map/catalogue changes and complete save continuity still require a separate compatibility decision.
+The owner accepted these behavior and architecture boundaries on 2026-10-04. Small lifecycle, timing, sync, and snapshot seams are permitted; wholesale game-engine replacement is not. Pause becomes consistent across systems, and valid legacy saves remain readable within the current map/catalogue. Future map/catalogue changes and complete save continuity still require a separate compatibility decision.
 
 Implementation slices and verification criteria are in [the Phase 0 plan](../../plans/phase-0-baseline-recovery.md), linked from [the overarching roadmap](../../plans/android-roadmap.md). Phase 0 completion requires automated and device evidence plus owner PR approval.
