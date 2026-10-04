@@ -191,7 +191,7 @@ public class ExampleInstrumentedTest {
     }
 
     @Test
-    public void validAndRejectedLegacyLoadsAreIsolatedBeforeWorkersResume() {
+    public void validLoadsAreIsolatedAndCorruptLoadsWaitForAcknowledgmentThenClose() {
         android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         Context appContext = instrumentation.getTargetContext();
         SharedPreferences saves = appContext.getSharedPreferences("GameSave", Context.MODE_PRIVATE);
@@ -223,11 +223,20 @@ public class ExampleInstrumentedTest {
 
         GameActivity rejected = launchLoadGame(instrumentation);
         assertFalse("invalid candidate must be rejected", rejected.loadSucceededForTest());
+        assertTrue("rejection must be visible and acknowledged", rejected.isRecoveryDialogShowingForTest());
+        assertTrue("LOAD must remain held while the rejection is visible",
+                rejected.pauseState.isPaused(PauseState.Reason.LOAD));
+        assertEquals("partial or fresh gameplay must stay hidden", View.INVISIBLE,
+                rejected.findViewById(android.R.id.content).getVisibility());
+        assertTrue("corruption copy must identify corruption",
+                rejected.recoveryMessageForTest().toLowerCase().contains("corrupt"));
         assertEquals("rejected load must leave the fresh session unchanged", 0,
                 rejected.gameManager.getScore());
-        assertEquals("rejected save data must remain available for recovery",
+        assertEquals("save remains until the player acknowledges the error",
                 persistedBeforeLoad, saves.getAll());
+        instrumentation.runOnMainSync(rejected::acknowledgeRecoveryForTest);
         finishAndAwaitClosed(instrumentation, rejected);
+        assertTrue("acknowledgment clears the rejected save", saves.getAll().isEmpty());
         saves.edit().clear().commit();
     }
 
@@ -257,7 +266,7 @@ public class ExampleInstrumentedTest {
         finishAndAwaitClosed(instrumentation, source);
         writeLegacyFixture(saves, rich.toLegacyValues());
 
-        GameActivity loaded = launchLoadGame(instrumentation);
+        GameActivity loaded = launchLoadGame(instrumentation, true);
         assertTrue(loaded.loadSucceededForTest());
         assertTrue(loaded.restoreWasIsolatedForTest());
         assertEquals(321, loaded.gameManager.getScore());
@@ -268,7 +277,7 @@ public class ExampleInstrumentedTest {
         Order order = loaded.gameManager.getActiveProcesses().get(0);
         assertEquals("Tomato Soup", order.getRecipe().getName());
         assertEquals(90, order.getTimeLimit());
-        assertTrue(order.getTimeRemaining() <= 47 && order.getTimeRemaining() >= 46);
+        assertEquals(47, order.getTimeRemaining());
         assertEquals(java.util.Arrays.asList(1), ingredientIds(loaded.game.getPots().get(0).getInPot()));
         assertEquals(java.util.Arrays.asList(4, 4), ingredientIds(loaded.game.getPots().get(1).getInPot()));
         finishAndAwaitClosed(instrumentation, loaded);
@@ -300,7 +309,7 @@ public class ExampleInstrumentedTest {
         assertEquals(5, firstPot.getPotFunctions().getCookProgress());
         assertTrue(firstLoad.saveGameStateForTest());
         assertEquals(5, saves.getInt("pot_0_cooking_progress", -1));
-        assertEquals("Tomato Soup", saves.getString("pot_0_recipe_name", null));
+        assertEquals("tomato_soup", saves.getString("pot_0_recipe_id", null));
         finishAndAwaitClosed(instrumentation, firstLoad);
 
         GameActivity secondLoad = launchLoadGame(instrumentation, true);
@@ -328,6 +337,11 @@ public class ExampleInstrumentedTest {
         GameActivity activity = launchGame(instrumentation);
         GameSaveSnapshot valid = instrumentationCall(instrumentation, activity::captureSnapshotForTest);
         writeLegacyFixture(saves, valid.toLegacyValues());
+        java.util.Map<String, Object> unverifiable = new java.util.HashMap<>(valid.toLegacyValues());
+        unverifiable.put("score", 999);
+        assertFalse("failed readback validation must fail the save",
+                com.game.cookingspree.util.PrefsHelper.writeGameSaveValues(unverifiable, stored -> false));
+        assertEquals("failed verification rolls back to the previous save", valid.toLegacyValues(), saves.getAll());
         java.util.Map<String, ?> beforeFailedSave = new java.util.HashMap<>(saves.getAll());
         Pot inconsistent = activity.game.getPots().get(0);
         instrumentation.runOnMainSync(() -> {
@@ -347,6 +361,77 @@ public class ExampleInstrumentedTest {
         instrumentation.runOnMainSync(() -> loaded.gameManager.setDeadProcessCount(3));
         await(() -> saves.getAll().isEmpty(), 2_000, "loaded game over should clear GameSave");
         assertTrue("later load must have no candidate", saves.getAll().isEmpty());
+        finishAndAwaitClosed(instrumentation, loaded);
+    }
+
+    @Test
+    public void incompatibleSaveShowsFullVersionsAndClearsOnlyAfterAcknowledgment() {
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        SharedPreferences saves = instrumentation.getTargetContext()
+                .getSharedPreferences("GameSave", Context.MODE_PRIVATE);
+        saves.edit().clear().putString("gameVersion", "2.4.1").commit();
+
+        GameActivity rejected = launchLoadGame(instrumentation);
+        assertFalse(rejected.loadSucceededForTest());
+        assertTrue(rejected.isRecoveryDialogShowingForTest());
+        String copy = rejected.recoveryMessageForTest();
+        assertTrue(copy.contains("2.4.1"));
+        assertTrue(copy.contains("1.0.0"));
+        assertTrue(rejected.pauseState.isPaused(PauseState.Reason.LOAD));
+        assertEquals(View.INVISIBLE, rejected.findViewById(android.R.id.content).getVisibility());
+        assertEquals("2.4.1", saves.getString("gameVersion", null));
+        instrumentation.runOnMainSync(rejected::acknowledgeRecoveryForTest);
+        finishAndAwaitClosed(instrumentation, rejected);
+        assertTrue(saves.getAll().isEmpty());
+    }
+
+    @Test
+    public void applicationFailureAfterPartialMutationStaysBlockedUntilAcknowledged() {
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        SharedPreferences saves = instrumentation.getTargetContext()
+                .getSharedPreferences("GameSave", Context.MODE_PRIVATE);
+        saves.edit().clear().commit();
+        GameActivity source = launchGame(instrumentation);
+        GameSaveSnapshot save = instrumentationCall(instrumentation, source::captureSnapshotForTest);
+        finishAndAwaitClosed(instrumentation, source);
+        writeLegacyFixture(saves, save.toLegacyValues());
+
+        Intent intent = new Intent(instrumentation.getTargetContext(), GameActivity.class)
+                .putExtra("loadSavedGame", true)
+                .putExtra("failRestoreAfterPositionForTest", true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        Activity launched = instrumentation.startActivitySync(intent);
+        assertTrue(launched instanceof GameActivity);
+        GameActivity rejected = (GameActivity) launched;
+        assertFalse(rejected.loadSucceededForTest());
+        assertTrue(rejected.isRecoveryDialogShowingForTest());
+        assertTrue(rejected.pauseState.isPaused(PauseState.Reason.LOAD));
+        assertFalse(rejected.gameManager.isRunning());
+        assertEquals(View.INVISIBLE, rejected.findViewById(android.R.id.content).getVisibility());
+        assertTrue(rejected.recoveryMessageForTest().toLowerCase().contains("corrupt"));
+        instrumentation.runOnMainSync(rejected::acknowledgeRecoveryForTest);
+        finishAndAwaitClosed(instrumentation, rejected);
+        assertTrue(saves.getAll().isEmpty());
+    }
+
+    @Test
+    public void compatibleTerminalSnapshotFinalizesAndClearsExactlyOnce() {
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        SharedPreferences saves = instrumentation.getTargetContext()
+                .getSharedPreferences("GameSave", Context.MODE_PRIVATE);
+        saves.edit().clear().commit();
+        GameActivity source = launchGame(instrumentation);
+        GameSaveSnapshot captured = instrumentationCall(instrumentation, source::captureSnapshotForTest);
+        GameSaveSnapshot terminal = new GameSaveSnapshot(captured.gameVersion, captured.playerX, captured.playerY,
+                432, 3, captured.heldItem, captured.tableItems, captured.orders, captured.pots);
+        finishAndAwaitClosed(instrumentation, source);
+        writeLegacyFixture(saves, terminal.toLegacyValues());
+
+        GameActivity loaded = launchLoadGame(instrumentation);
+        await(() -> saves.getAll().isEmpty(), 2_000, "terminal restore did not finalize and clear the save");
+        assertTrue(loaded.gameManager.isGameOver());
+        assertEquals(432, loaded.gameManager.getScore());
+        assertFalse(loaded.gameManager.isRunning());
         finishAndAwaitClosed(instrumentation, loaded);
     }
 
@@ -371,6 +456,35 @@ public class ExampleInstrumentedTest {
         assertNull("food is collected only once", pot.getFood());
         finishAndAwaitClosed(instrumentation, activity);
         saves.edit().clear().commit();
+    }
+
+    @Test
+    public void saveDuringInterpolationCapturesLastReachedTile() {
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        GameActivity activity = launchGame(instrumentation);
+        Player player = activity.game.getPlayer();
+        float committedX = Math.round(player.getX() / Game.TILE_SIZE) * Game.TILE_SIZE;
+        float committedY = Math.round(player.getY() / Game.TILE_SIZE) * Game.TILE_SIZE;
+        int[][] directions = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        int[] selected = null;
+        for (int[] direction : directions) {
+            if (activity.game.canMoveTo(committedX + direction[0] * Game.TILE_SIZE,
+                    committedY + direction[1] * Game.TILE_SIZE)) {
+                selected = direction;
+                break;
+            }
+        }
+        assertNotNull("spawn should have a traversable neighbor", selected);
+        int[] direction = selected;
+        instrumentation.runOnMainSync(() -> player.move(direction[0], direction[1]));
+        await(() -> Math.abs(player.getX() - committedX) + Math.abs(player.getY() - committedY) >= 12f
+                        && Math.abs(player.getX() - committedX) + Math.abs(player.getY() - committedY) < Game.TILE_SIZE,
+                2_000, "player did not enter an interpolated tile move");
+        instrumentation.runOnMainSync(() -> activity.gameManager.pauseGame());
+        GameSaveSnapshot snapshot = instrumentationCall(instrumentation, activity::captureSnapshotForTest);
+        assertEquals(committedX, snapshot.playerX, 0.001f);
+        assertEquals(committedY, snapshot.playerY, 0.001f);
+        finishAndAwaitClosed(instrumentation, activity);
     }
 
     private static GameActivity launchLoadGame(android.app.Instrumentation instrumentation) {
@@ -459,6 +573,7 @@ public class ExampleInstrumentedTest {
         IngredientFetchWorker fetcher = activity.getIngredientFetcherForTest();
         PotThreadPool potPool = activity.getPotThreadPoolForTest();
         instrumentation.runOnMainSync(activity::finish);
+        instrumentation.waitForIdleSync();
         await(() -> manager.isClosed() && fetcher.isClosed() && potPool.isClosed(),
                 5_000, "re-entered activity owners did not close within the bound");
     }

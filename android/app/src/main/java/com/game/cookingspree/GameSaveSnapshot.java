@@ -8,26 +8,37 @@ import java.util.Map;
 
 /** Immutable in-memory representation written using the existing GameSave keys. */
 final class GameSaveSnapshot {
+    final String gameVersion;
     final int playerX;
     final int playerY;
     final int score;
     final int deadProcessCount;
+    final boolean terminal;
     final SavedItem heldItem;
     final List<SavedItem> tableItems;
     final List<SavedOrder> orders;
     final List<SavedPot> pots;
 
-    GameSaveSnapshot(int playerX, int playerY, int score, int deadProcessCount,
+    GameSaveSnapshot(String gameVersion, int playerX, int playerY, int score, int deadProcessCount,
                      SavedItem heldItem, List<SavedItem> tableItems,
                      List<SavedOrder> orders, List<SavedPot> pots) {
+        this.gameVersion = gameVersion;
         this.playerX = playerX;
         this.playerY = playerY;
         this.score = score;
         this.deadProcessCount = deadProcessCount;
+        this.terminal = deadProcessCount == 3;
         this.heldItem = heldItem;
         this.tableItems = immutableNullableCopy(tableItems);
         this.orders = Collections.unmodifiableList(new ArrayList<>(orders));
         this.pots = Collections.unmodifiableList(new ArrayList<>(pots));
+    }
+
+    GameSaveSnapshot(int playerX, int playerY, int score, int deadProcessCount,
+                     SavedItem heldItem, List<SavedItem> tableItems,
+                     List<SavedOrder> orders, List<SavedPot> pots) {
+        this(BuildConfig.VERSION_NAME, playerX, playerY, score, deadProcessCount,
+                heldItem, tableItems, orders, pots);
     }
 
     static GameSaveSnapshot capture(Game game, GameManager manager, PlayerInventory inventory) {
@@ -48,7 +59,7 @@ final class GameSaveSnapshot {
 
         List<SavedPot> pots = new ArrayList<>();
         for (Pot pot : game.getPots()) pots.add(pot.snapshotForSave());
-        return new GameSaveSnapshot(playerX, playerY, manager.getScore(), manager.getDeadProcessCount(),
+        return new GameSaveSnapshot(BuildConfig.VERSION_NAME, playerX, playerY, manager.getScore(), manager.getDeadProcessCount(),
                 held, tables, orders, pots);
     }
 
@@ -71,6 +82,7 @@ final class GameSaveSnapshot {
 
     Map<String, Object> toLegacyValues() {
         Map<String, Object> values = new LinkedHashMap<>();
+        values.put("gameVersion", gameVersion);
         values.put("playerX", (float) playerX);
         values.put("playerY", (float) playerY);
         values.put("score", score);
@@ -86,7 +98,7 @@ final class GameSaveSnapshot {
         values.put("processCount", orders.size());
         for (int i = 0; i < orders.size(); i++) {
             SavedOrder order = orders.get(i);
-            values.put("process_" + i + "_recipe", order.recipeName);
+            values.put("process_" + i + "_recipe", recipeId(order.recipeName));
             values.put("process_" + i + "_remaining", order.remainingSeconds);
             values.put("process_" + i + "_limit", order.limitSeconds);
         }
@@ -104,7 +116,7 @@ final class GameSaveSnapshot {
                 writeFood(values, prefix + "food_", pot.food);
             } else if (pot.state == Pot.State.COOKING) {
                 values.put(prefix + "cooking_progress", pot.cookingProgress);
-                values.put(prefix + "recipe_name", pot.recipeName);
+                values.put(prefix + "recipe_id", recipeId(pot.recipeName));
                 values.put(prefix + "recipe_ingredientCount", pot.recipeIngredients.size());
                 for (int j = 0; j < pot.recipeIngredients.size(); j++) {
                     values.put(prefix + "recipe_ingredient_" + j + "_id", pot.recipeIngredients.get(j));
@@ -125,6 +137,7 @@ final class GameSaveSnapshot {
         values.put(metadataPrefix + "Id", item.id);
         values.put(metadataPrefix + "Name", item.name);
         if (item.type == PlayerInventory.COOKED) {
+            values.put(metadataPrefix + "RecipeId", recipeId(item.name));
             String countKey = ingredientsPrefix.equals("heldItem")
                     ? ingredientsPrefix + "IngredientsCount" : ingredientsPrefix + "ingredientsCount";
             values.put(countKey, item.ingredients.size());
@@ -141,6 +154,7 @@ final class GameSaveSnapshot {
     private static void writeFood(Map<String, Object> values, String prefix, SavedItem food) {
         values.put(prefix + "id", food.id);
         values.put(prefix + "name", food.name);
+        values.put(prefix + "recipe_id", recipeId(food.name));
         values.put(prefix + "ingredientCount", food.ingredients.size());
         for (int i = 0; i < food.ingredients.size(); i++) {
             values.put(prefix + "ingredient_" + i + "_id", food.ingredients.get(i));
@@ -156,6 +170,22 @@ final class GameSaveSnapshot {
             case 4: return "tomato";
             default: throw new IllegalArgumentException("Unknown ingredient id: " + id);
         }
+    }
+
+    static String recipeId(String name) {
+        for (Recipe recipe : Recipe.getDefaultRecipes()) {
+            if (recipe.getName().equals(name)) return recipe.getId();
+        }
+        if ("Waste".equals(name)) return "waste";
+        throw new IllegalArgumentException("Unknown recipe name: " + name);
+    }
+
+    static String recipeName(String id) {
+        for (Recipe recipe : Recipe.getDefaultRecipes()) {
+            if (recipe.getId().equals(id)) return recipe.getName();
+        }
+        if ("waste".equals(id)) return "Waste";
+        return null;
     }
 
     private static <T> List<T> immutableNullableCopy(List<T> items) {

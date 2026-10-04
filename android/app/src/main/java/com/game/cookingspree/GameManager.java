@@ -224,6 +224,13 @@ public class GameManager {
             endGame();
         }
     }
+
+    void restoreTerminalResult(int finalScore, int failures) {
+        if (closed || isGameOver || failures != MAX_DEAD_PROCESSES) return;
+        score = finalScore;
+        deadProcessCount = failures;
+        endGame();
+    }
     private void handlePendingRemovals() {
         synchronized (mutex) {
             if (!pendingRemovals.isEmpty()) {

@@ -5,6 +5,7 @@ import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 
 import android.content.Intent;
+import android.app.AlertDialog;
 import android.media.MediaPlayer;
 import android.media.PlaybackParams;
 import android.os.Bundle;
@@ -68,6 +69,7 @@ public class GameActivity extends BaseActivity implements
     private BasketManager basketManager;
     private boolean loadSucceededForTest;
     private boolean restoreWasIsolatedForTest;
+    private AlertDialog recoveryDialog;
 
     protected int getGameLayoutResource() { return R.layout.activity_game; }
 
@@ -164,10 +166,22 @@ public class GameActivity extends BaseActivity implements
             if (gameManager == null || gameManager.isGameOver()
                     || !pauseState.isPaused(PauseState.Reason.MANUAL_MENU)) return false;
             GameSaveSnapshot snapshot = GameSaveSnapshot.capture(game, gameManager, playerInventory);
-            GameSaveParser.parse(snapshot.toLegacyValues(), game.getTables().size(), game.getPots().size(),
-                    game.getMapWidth(), game.getMapHeight(), game.getPots().get(0).getPotFunctions().getMaximumProgressTicks(),
-                    game::isTraversableTile);
-            return PrefsHelper.writeGameSaveValues(snapshot.toLegacyValues());
+            Map<String, Object> values = snapshot.toLegacyValues();
+            GameSaveParser.parse(values, game.getTables().size(), game.getPots().size(),
+                    game.getMapWidth(), game.getMapHeight(),
+                    game.getPots().get(0).getPotFunctions().getMaximumProgressTicks(), game::isTraversableTile);
+            return PrefsHelper.writeGameSaveValues(values, stored -> {
+                try {
+                    GameSaveSnapshot verified = GameSaveParser.parse(stored,
+                            game.getTables().size(), game.getPots().size(), game.getMapWidth(), game.getMapHeight(),
+                            game.getPots().get(0).getPotFunctions().getMaximumProgressTicks(), game::isTraversableTile);
+                    return snapshot.gameVersion.equals(verified.gameVersion)
+                            && GameVersionPolicy.compatibility(verified.gameVersion, BuildConfig.VERSION_NAME)
+                            == GameVersionPolicy.Compatibility.COMPATIBLE;
+                } catch (GameSaveParser.InvalidSaveException invalid) {
+                    return false;
+                }
+            });
         } catch (Exception e) {
             Log.e(TAG, "Error saving game snapshot", e);
             return false;
@@ -175,18 +189,34 @@ public class GameActivity extends BaseActivity implements
     }
 
     private void loadGameState() {
+        View activityContent = findViewById(android.R.id.content);
+        activityContent.setVisibility(INVISIBLE);
+        Map<String, ?> stored = getSharedPreferences("GameSave", MODE_PRIVATE).getAll();
+        Object rawVersion = stored.get("gameVersion");
+        String savedVersion = rawVersion instanceof String ? (String) rawVersion : null;
+        if (GameVersionPolicy.compatibility(savedVersion, BuildConfig.VERSION_NAME)
+                != GameVersionPolicy.Compatibility.COMPATIBLE) {
+            String copy = getString(R.string.incompatible_save_message,
+                    GameVersionPolicy.displayVersion(savedVersion), BuildConfig.VERSION_NAME);
+            rejectLoadedSave(copy);
+            return;
+        }
+
         boolean loaded = false;
         List<String> basketContentsBeforeRestore = basketManager.getContentsSnapshotForTest();
         try {
             GameSaveSnapshot candidate = GameSaveParser.parse(
-                    getSharedPreferences("GameSave", MODE_PRIVATE).getAll(), game.getTables().size(),
+                    stored, game.getTables().size(),
                     game.getPots().size(), game.getMapWidth(), game.getMapHeight(),
                     game.getPots().get(0).getPotFunctions().getMaximumProgressTicks(), game::isTraversableTile);
 
-            // No live state is touched until the entire legacy record has passed validation.
+            // No live state is touched until the entire versioned save has passed validation.
             game.getPlayer().setPosition(candidate.playerX, candidate.playerY);
+            if (getIntent().getBooleanExtra("failRestoreAfterPositionForTest", false)) {
+                throw new IllegalStateException("Injected restore application failure");
+            }
             gameManager.setScore(candidate.score);
-            gameManager.setDeadProcessCount(candidate.deadProcessCount);
+            if (!candidate.terminal) gameManager.setDeadProcessCount(candidate.deadProcessCount);
             playerInventory.getAndRemoveItem();
             if (candidate.heldItem != null) playerInventory.grabItem(createSavedItem(candidate.heldItem));
 
@@ -204,7 +234,7 @@ public class GameActivity extends BaseActivity implements
             for (int i = 0; i < pots.size(); i++) pots.get(i).restoreForLoad(candidate.pots.get(i));
 
             // All restored cooking state is installed before any resumed worker is submitted.
-            for (int i = 0; i < pots.size(); i++) {
+            for (int i = 0; !candidate.terminal && i < pots.size(); i++) {
                 GameSaveSnapshot.SavedPot saved = candidate.pots.get(i);
                 if (saved.state != Pot.State.COOKING) continue;
                 Pot pot = pots.get(i);
@@ -237,17 +267,36 @@ public class GameActivity extends BaseActivity implements
                     && gameManager.getActiveProcesses().size() == candidate.orders.size()
                     && basketContentsBeforeRestore.equals(basketManager.getContentsSnapshotForTest());
             loaded = true;
+            if (candidate.terminal) gameManager.restoreTerminalResult(candidate.score, candidate.deadProcessCount);
+            activityContent.setVisibility(VISIBLE);
         } catch (Exception e) {
-            Log.w(TAG, "Saved run was rejected; preserving it and starting a fresh session", e);
+            Log.w(TAG, "Saved run is corrupt and cannot be restored", e);
         } finally {
             loadSucceededForTest = loaded;
             if (loaded && getIntent().getBooleanExtra("pauseAfterLoadForTest", false)) {
                 gameManager.pauseGame();
             }
-            if (gameManager != null) gameManager.setLoading(false);
+            if (loaded && !gameManager.isGameOver()) gameManager.setLoading(false);
         }
-        Toast.makeText(this, loaded ? "Game loaded" : "Save could not be loaded. Starting a new game.",
-                Toast.LENGTH_LONG).show();
+        if (!loaded) rejectLoadedSave(getString(R.string.corrupt_save_message));
+        else if (!gameManager.isGameOver()) Toast.makeText(this, "Game loaded", Toast.LENGTH_LONG).show();
+    }
+
+    private void rejectLoadedSave(String message) {
+        loadSucceededForTest = false;
+        if (gameManager != null) gameManager.setLoading(true);
+        recoveryDialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.save_recovery_title)
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    PrefsHelper.clearSaveState();
+                    Intent intent = new Intent(GameActivity.this, MainActivity.class);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                    finish();
+                })
+                .show();
     }
 
     private FoodItem createSavedItem(GameSaveSnapshot.SavedItem saved) {
@@ -276,6 +325,15 @@ public class GameActivity extends BaseActivity implements
     int getDeliveredSessionCallbacksForTest() { return sessionCallbacks.deliveredCount(); }
     boolean loadSucceededForTest() { return loadSucceededForTest; }
     boolean restoreWasIsolatedForTest() { return restoreWasIsolatedForTest; }
+    boolean isRecoveryDialogShowingForTest() { return recoveryDialog != null && recoveryDialog.isShowing(); }
+    String recoveryMessageForTest() {
+        if (recoveryDialog == null) return null;
+        android.widget.TextView message = recoveryDialog.findViewById(android.R.id.message);
+        return message == null ? null : message.getText().toString();
+    }
+    void acknowledgeRecoveryForTest() {
+        if (isRecoveryDialogShowingForTest()) recoveryDialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+    }
     boolean saveGameStateForTest() { return saveGameState(); }
     GameSaveSnapshot captureSnapshotForTest() {
         return GameSaveSnapshot.capture(game, gameManager, playerInventory);

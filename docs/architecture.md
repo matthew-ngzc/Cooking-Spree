@@ -35,6 +35,7 @@ MainActivity ──> GameActivity / TutorialActivity
 | Orders, score, failures | `GameManager` | Main-thread handlers schedule spawning and 16-ms ticks. Spawn delay and order elapsed time stop across pauses. |
 | Pause reasons / active time | Session `PauseState`, coordinated by `GameManager` | Manual menu, background, and tutorial pauses are independent; terminal and closed are final. Worker durations consume active time only. |
 | Activity/HUD state | `GameActivity` | Receives callbacks and updates Android views. |
+| Save compatibility and snapshots | `GameVersionPolicy`, `GameSaveSnapshot`, `GameSaveParser`, `PrefsHelper` | Same-major saves are parsed before application and again after synchronous persistence; failures remain behind the `LOAD` pause until the player acknowledges and the activity returns to the menu. |
 | Session workers | Owning activity session | Activity close stops manager handlers, interrupts the pot pool and fetcher, and the fetcher closes its filler and queue. |
 
 ## Concurrency boundaries
@@ -53,8 +54,9 @@ On 2026-10-03, `testDebugUnitTest`, `assembleDebug`, and `assembleDebugAndroidTe
 
 - The map's external TSX paths/names, JSON object properties, Java switch cases, and asset filenames are a single integration seam.
 - `GameActivity` serializes directly against object ordering (tables, pots, baskets); map reordering can silently remap saved state.
+- Saves use stable item and recipe identities but still bind table and pot records to their current map ordering; map object reordering requires a major version bump or explicit migration.
 - Session ownership and closure span the manager, renderer, cooking pool, fetcher, and its filler; future asynchronous owners must join this close boundary.
-- `Recipe` identity is name-based at submission/save boundaries; rename migrations need compatibility handling.
+- Recipe submission still matches player-facing names, while persistence uses stable recipe IDs and derives current display names; removing or reinterpreting an ID requires a save-compatibility major bump.
 
 ## Source navigation
 

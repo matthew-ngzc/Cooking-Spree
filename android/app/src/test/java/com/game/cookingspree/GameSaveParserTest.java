@@ -17,6 +17,7 @@ public class GameSaveParserTest {
         legacy.put("pot_0_ingredientCount", 0);
         legacy.put("pot_0_food_id", 5);
         legacy.put("pot_0_food_name", "Waste");
+        legacy.put("pot_0_food_recipe_id", "waste");
         legacy.put("pot_0_food_ingredientCount", 0);
         legacy.put("pot_1_ingredientCount", 2);
         legacy.put("pot_1_ingredient_0_id", 1);
@@ -30,8 +31,30 @@ public class GameSaveParserTest {
         GameSaveSnapshot second = parse(serialized);
 
         assertEquals(serialized, second.toLegacyValues());
+        assertEquals(BuildConfig.VERSION_NAME, second.gameVersion);
         assertEquals("Waste", second.pots.get(0).food.name);
         assertEquals(2, second.pots.get(1).ingredients.size());
+    }
+
+    @Test
+    public void cookedDishWithoutMatchingActiveOrderRemainsValid() throws Exception {
+        Map<String, Object> save = validLegacySave();
+        save.put("heldItemType", PlayerInventory.COOKED);
+        save.put("heldItemId", 5);
+        save.put("heldItemName", "Tomato Soup");
+        save.put("heldItemRecipeId", "tomato_soup");
+        save.put("heldItemIngredientsCount", 3);
+        save.put("heldItemIngredient_0_id", 4);
+        save.put("heldItemIngredient_0_name", "old tomato label");
+        save.put("heldItemIngredient_1_id", 0);
+        save.put("heldItemIngredient_1_name", "carrot");
+        save.put("heldItemIngredient_2_id", 2);
+        save.put("heldItemIngredient_2_name", "onion");
+        GameSaveSnapshot parsed = parse(save);
+        assertEquals("Tomato Soup", parsed.heldItem.name);
+        assertEquals(0, parsed.orders.size());
+        assertEquals("Tomato Soup", parsed.toLegacyValues().get("heldItemName"));
+        assertEquals("tomato", parsed.toLegacyValues().get("heldItemIngredient_0_name"));
     }
 
     @Test
@@ -43,7 +66,7 @@ public class GameSaveParserTest {
         legacy.put("pot_0_ingredient_1_id", 0);
         legacy.put("pot_0_ingredient_2_id", 2);
         legacy.put("pot_0_cooking_progress", 2);
-        legacy.put("pot_0_recipe_name", "Tomato Soup");
+        legacy.put("pot_0_recipe_id", "tomato_soup");
         legacy.put("pot_0_recipe_ingredientCount", 3);
         legacy.put("pot_0_recipe_ingredient_0_id", 4);
         legacy.put("pot_0_recipe_ingredient_1_id", 0);
@@ -85,31 +108,35 @@ public class GameSaveParserTest {
         });
         assertRejected(save -> {
             save.put("processCount", 1);
-            save.put("process_0_recipe", "Tomato Soup");
+            save.put("process_0_recipe", "tomato_soup");
             save.put("process_0_remaining", 61);
             save.put("process_0_limit", 60);
         });
         assertRejected(save -> {
             save.put("processCount", 1);
-            save.put("process_0_recipe", "Tomato Soup");
+            save.put("process_0_recipe", "tomato_soup");
             save.put("process_0_remaining", 30);
-            save.put("process_0_limit", 59);
+            save.put("process_0_limit", 0);
         });
         assertRejected(save -> {
             save.put("heldItemType", PlayerInventory.COOKED);
             save.put("heldItemId", 5);
             save.put("heldItemName", "Tomato Soup");
+            save.put("heldItemRecipeId", "tomato_soup");
             save.put("heldItemIngredientsCount", 3);
             save.put("heldItemIngredient_0_id", 4);
             save.put("heldItemIngredient_0_name", "wrong");
-            save.put("heldItemIngredient_1_id", 0);
+            save.put("heldItemIngredient_1_id", 1);
             save.put("heldItemIngredient_1_name", "carrot");
             save.put("heldItemIngredient_2_id", 2);
             save.put("heldItemIngredient_2_name", "onion");
         });
         assertRejected(save -> save.put("playerX", 3000f));
         assertRejected(save -> save.put("score", -1));
-        assertRejected(save -> save.put("deadProcessCount", 3)); // A terminal run is not resumable.
+        Map<String, Object> terminal = validLegacySave();
+        terminal.put("deadProcessCount", 3);
+        try { assertTrue(parse(terminal).terminal); }
+        catch (GameSaveParser.InvalidSaveException e) { fail(e.getMessage()); }
         assertRejected(save -> {
             makeCooking(save, "Tomato Soup", 4, 0, 2);
             save.put("pot_0_cooking_progress", 6);
@@ -118,6 +145,20 @@ public class GameSaveParserTest {
             makeCooking(save, "Tomato Soup", 4, 0, 2);
             save.put("pot_0_cooking_progress", -1);
         });
+    }
+
+    @Test
+    public void sameMajorSaveKeepsItsOriginalOrderTimingAcrossBalanceChanges() throws Exception {
+        Map<String, Object> save = validLegacySave();
+        save.put("gameVersion", "1.9.4");
+        save.put("processCount", 1);
+        save.put("process_0_recipe", "tomato_soup");
+        save.put("process_0_remaining", 121);
+        save.put("process_0_limit", 150);
+
+        GameSaveSnapshot parsed = parse(save);
+        assertEquals(121, parsed.orders.get(0).remainingSeconds);
+        assertEquals(150, parsed.orders.get(0).limitSeconds);
     }
 
     @Test
@@ -176,6 +217,7 @@ public class GameSaveParserTest {
 
     private static Map<String, Object> validLegacySave() {
         Map<String, Object> save = new HashMap<>();
+        save.put("gameVersion", "1.0.0");
         save.put("playerX", 120f);
         save.put("playerY", 120f);
         save.put("score", 10);
@@ -201,7 +243,9 @@ public class GameSaveParserTest {
         save.put("pot_0_ingredient_1_id", recipeB);
         save.put("pot_0_ingredient_2_id", recipeC);
         save.put("pot_0_cooking_progress", 2);
-        save.put("pot_0_recipe_name", recipe);
+        String stableId = "Waste".equals(recipe) ? "waste"
+                : "Unknown Dish".equals(recipe) ? "unknown" : GameSaveSnapshot.recipeId(recipe);
+        save.put("pot_0_recipe_id", stableId);
         List<Integer> recipeIds = recipe.equals("Tomato Soup")
                 ? java.util.Arrays.asList(4, 0, 2) : new ArrayList<>();
         save.put("pot_0_recipe_ingredientCount", recipeIds.size());

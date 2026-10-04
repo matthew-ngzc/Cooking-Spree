@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.HashMap;
 
 public final class PrefsHelper {
+    public interface GameSaveVerifier { boolean isValid(Map<String, ?> storedValues); }
     public interface SyncAdapter {
         void updateSetting(String key, Object value);
         void updateStat(String key, Object value);
@@ -103,9 +104,12 @@ public final class PrefsHelper {
     public static int getDailyStreak() { return prefs.getInt("profile_daily_streak", 0); }
 
     public static void clearAll() { prefs.edit().clear().apply(); clearSaveState(); }
-    public static void clearSaveState() { gameSavePrefs.edit().clear().apply(); }
+    public static synchronized void clearSaveState() { gameSavePrefs.edit().clear().commit(); }
     public static synchronized boolean writeGameSaveValues(Map<String, ?> values) {
-        if (gameSavePrefs == null || values == null) return false;
+        return writeGameSaveValues(values, stored -> values.equals(stored));
+    }
+    public static synchronized boolean writeGameSaveValues(Map<String, ?> values, GameSaveVerifier verifier) {
+        if (gameSavePrefs == null || values == null || verifier == null) return false;
         for (Object value : values.values()) {
             if (!(value instanceof String || value instanceof Integer || value instanceof Float
                     || value instanceof Long || value instanceof Boolean)) return false;
@@ -113,10 +117,18 @@ public final class PrefsHelper {
         Map<String, ?> previous = new HashMap<>(gameSavePrefs.getAll());
         SharedPreferences.Editor editor = gameSavePrefs.edit().clear();
         putValues(editor, values);
-        if (editor.commit()) return true;
+        boolean verified = false;
+        try {
+            verified = editor.commit() && values.equals(gameSavePrefs.getAll())
+                    && verifier.isValid(new HashMap<>(gameSavePrefs.getAll()));
+        } catch (RuntimeException failure) {
+            Log.w("GameSave", "Stored save verification failed (" + failure.getClass().getSimpleName() + ")");
+        }
+        if (verified) return true;
         SharedPreferences.Editor rollback = gameSavePrefs.edit().clear();
         putValues(rollback, previous);
-        rollback.commit();
+        boolean restored = rollback.commit() && previous.equals(gameSavePrefs.getAll());
+        if (!restored) Log.e("GameSave", "Failed to restore the previous verified save");
         return false;
     }
 

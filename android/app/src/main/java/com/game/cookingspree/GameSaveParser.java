@@ -6,7 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Parses and validates the existing, unversioned GameSave key format without mutating a session. */
+/** Parses and validates a versioned GameSave map without mutating a session. */
 final class GameSaveParser {
     interface TileValidator { boolean isTraversable(int tileX, int tileY); }
 
@@ -49,11 +49,12 @@ final class GameSaveParser {
     }
 
     private GameSaveSnapshot parse() throws InvalidSaveException {
+        String version = requiredString("gameVersion");
         int[] position = normalizePosition(requiredFloat("playerX"), requiredFloat("playerY"));
         int score = requiredInt("score");
         int failures = requiredInt("deadProcessCount");
         if (score < 0) throw invalid("Score is negative");
-        if (failures < 0 || failures >= 3) throw invalid("Failure count is terminal or invalid");
+        if (failures < 0 || failures > 3) throw invalid("Failure count is invalid");
 
         GameSaveSnapshot.SavedItem held = readItem("heldItem", "heldItem", "heldItem", PlayerInventory.EMPTY);
         int savedTableCount = requiredInt("tableCount");
@@ -71,11 +72,12 @@ final class GameSaveParser {
         List<GameSaveSnapshot.SavedOrder> orders = new ArrayList<>();
         for (int i = 0; i < processCount; i++) {
             String prefix = "process_" + i + "_";
-            String recipe = requiredString(prefix + "recipe");
-            if (!recipes.containsKey(recipe)) throw invalid("Unknown order recipe");
+            String recipeId = requiredString(prefix + "recipe");
+            String recipe = GameSaveSnapshot.recipeName(recipeId);
+            if (recipe == null || "Waste".equals(recipe)) throw invalid("Unknown order recipe identity");
             int remaining = requiredInt(prefix + "remaining");
             int limit = requiredInt(prefix + "limit");
-            if (limit < 60 || limit > 120 || remaining < 1 || remaining > limit) {
+            if (limit < 1 || remaining < 1 || remaining > limit) {
                 throw invalid("Order time is out of range");
             }
             orders.add(new GameSaveSnapshot.SavedOrder(recipe, remaining, limit));
@@ -85,7 +87,7 @@ final class GameSaveParser {
         if (savedPotCount != potCount) throw invalid("Saved pot count does not match this map");
         List<GameSaveSnapshot.SavedPot> pots = new ArrayList<>();
         for (int i = 0; i < savedPotCount; i++) pots.add(readPot(i));
-        return new GameSaveSnapshot(position[0] * Game.TILE_SIZE, position[1] * Game.TILE_SIZE,
+        return new GameSaveSnapshot(version, position[0] * Game.TILE_SIZE, position[1] * Game.TILE_SIZE,
                 score, failures, held, tables, orders, pots);
     }
 
@@ -104,7 +106,9 @@ final class GameSaveParser {
                 if (ingredients.size() != 3) throw invalid("A cooking pot must contain three ingredients");
                 int progress = requiredInt(prefix + "cooking_progress");
                 if (progress < 0 || progress >= maxCookingTicks) throw invalid("Pot progress is out of range");
-                String recipeName = requiredString(prefix + "recipe_name");
+                String recipeId = requiredString(prefix + "recipe_id");
+                String recipeName = GameSaveSnapshot.recipeName(recipeId);
+                if (recipeName == null) throw invalid("Unknown cooking recipe identity");
                 List<Integer> recipeIngredients = readIds(prefix + "recipe_ingredientCount", prefix + "recipe_ingredient_", 3);
                 validateRecipeIngredients(recipeName, recipeIngredients, true);
                 if ("Waste".equals(recipeName) && !recipeIngredients.isEmpty()) {
@@ -119,7 +123,8 @@ final class GameSaveParser {
             case DONE: {
                 if (!ingredients.isEmpty()) throw invalid("A finished pot still has uncooked ingredients");
                 int id = requiredInt(prefix + "food_id");
-                String name = requiredString(prefix + "food_name");
+                String name = GameSaveSnapshot.recipeName(requiredString(prefix + "food_recipe_id"));
+                if (name == null) throw invalid("Unknown finished food identity");
                 List<Integer> madeWith = readIds(prefix + "food_ingredientCount", prefix + "food_ingredient_", 3);
                 GameSaveSnapshot.SavedItem food = new GameSaveSnapshot.SavedItem(
                         PlayerInventory.COOKED, id, name, madeWith);
@@ -139,7 +144,7 @@ final class GameSaveParser {
             throw invalid("Unknown item type");
         }
         int id = requiredInt(metadataPrefix + "Id");
-        String name = requiredString(metadataPrefix + "Name");
+        String name;
         List<Integer> ingredients = Collections.emptyList();
         if (type == PlayerInventory.COOKED) {
             String countKey = ingredientsPrefix.equals("heldItem")
@@ -147,15 +152,16 @@ final class GameSaveParser {
             if (values.containsKey(countKey)) {
                 ingredients = readIds(countKey, ingredientsPrefix.equals("heldItem")
                         ? ingredientsPrefix + "Ingredient_" : ingredientsPrefix + "ingredient_", 3);
-                String ingredientPrefix = ingredientsPrefix.equals("heldItem")
-                        ? ingredientsPrefix + "Ingredient_" : ingredientsPrefix + "ingredient_";
-                for (int i = 0; i < ingredients.size(); i++) {
-                    String savedName = requiredString(ingredientPrefix + i + "_name");
-                    if (!GameSaveSnapshot.ingredientName(ingredients.get(i)).equals(savedName)) {
-                        throw invalid("Item ingredient name does not match its ID");
-                    }
-                }
             }
+        }
+        if (type == PlayerInventory.INGREDIENT) {
+            if (id < 0 || id > 4) throw invalid("Unknown ingredient identity");
+            name = GameSaveSnapshot.ingredientName(id);
+        }
+        else {
+            String recipeId = requiredString(metadataPrefix + "RecipeId");
+            name = GameSaveSnapshot.recipeName(recipeId);
+            if (name == null) throw invalid("Unknown cooked food identity");
         }
         GameSaveSnapshot.SavedItem item = new GameSaveSnapshot.SavedItem(type, id, name, ingredients);
         validateItem(item);
