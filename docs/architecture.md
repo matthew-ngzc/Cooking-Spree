@@ -52,7 +52,7 @@ On 2026-10-03, `testDebugUnitTest`, `assembleDebug`, and `assembleDebugAndroidTe
 
 On 2026-10-04, the integration suite passed 14/14 tests on `emulator-5556` (Medium_Phone_API_36, API 36). It repeats tutorial entry/exit five times, preserves the five-surface recreation check, and drives actual three-order expiries in both fresh and restored runs. `GameplayRulesTest` independently covers the pure recipe multiset, order countdown, scoring streak, and failure threshold seams. The automated run is supplemented by the visible acceptance evidence and explicit successful-submission capture limitation in [development.md](development.md).
 
-After the integration PR was restacked on the amended save branch on 2026-10-05, the combined suite passed 18/18 device tests on `emulator-5554` (Medium_Phone_API_36, API 36). Terminal save restoration now enters the same `FailureCounter` terminal seam used by live order expiry before the one-shot game-over callback runs; this avoids a second, divergent failure-count path.
+After the integration PR was restacked on the two-slot save branch on 2026-10-05, the combined suite passed 19/19 device tests on `emulator-5554` (Medium_Phone_API_36, API 36). Terminal save restoration now enters the same `FailureCounter` terminal seam used by live order expiry before the one-shot game-over callback runs; this avoids a second, divergent failure-count path.
 
 ## High-risk seams
 
