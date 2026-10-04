@@ -4,6 +4,8 @@ Status: Accepted
 Date: 2026-10-01
 Accepted: 2026-10-04
 
+The save-compatibility portion of this decision was superseded by [ADR 0007](0007-versioned-verified-saves.md) on 2026-10-05. Its session, pause, teardown, and non-consuming snapshot decisions remain accepted.
+
 ## Context
 
 The current offline baseline has duplicate tutorial sessions, unfinished worker teardown, inconsistent pause behavior, destructive pot saves, and partially applied legacy loads. Baseline recovery needs explicit behavior without expanding into a new engine, cloud feature, or save migration project.
