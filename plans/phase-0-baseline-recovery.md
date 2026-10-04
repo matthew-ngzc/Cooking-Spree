@@ -212,6 +212,14 @@ The owner superseded the unversioned legacy-load policy on 2026-10-05. Preserve 
 - [x] **Enter/skip/complete tutorial; repeat five times:** 0D labelled captures plus the 0F five-cycle connected run verify controls, pause, and one session.
 - [x] **Destroy/recreate while workers run or wait:** connected coverage repeats five real surface cycles and closes active cook/fetch/queue work with one render loop and bounded teardown.
 
+## Post-review recording evidence follow-up
+
+- [x] Record PR #2's signed-out offline launch, settings change, restart, and persisted settings with visible touch indicators; attached from Android Emulator `emulator-5556` / API 36 in [the PR #2 evidence comment](https://github.com/matthew-ngzc/Cooking-Spree/pull/2#issuecomment-5978169379).
+- [x] Record PR #4's tutorial and pause/background/foreground flows with visible touch indicators; attached from Android Emulator `emulator-5556` / API 36 in [the PR #4 evidence comment](https://github.com/matthew-ngzc/Cooking-Spree/pull/4#issuecomment-5978170944). Explicit resume and frozen-timer behavior remain covered by the connected tests.
+- [x] Record PR #6's player-visible non-destructive save/load flow with visible touch indicators; attached from Android Emulator `emulator-5556` / API 36 in [the PR #6 evidence comment](https://github.com/matthew-ngzc/Cooking-Spree/pull/6#issuecomment-5978172399). Cooking-worker reload, malformed recovery, and completed-save clearing require test fixtures not reachable through ordinary play and remain covered by automated persistence tests.
+- [x] Record PR #7's kitchen interaction and terminal-flow evidence with visible touch indicators; attached from Android Emulator `emulator-5556` / API 36 in [the PR #7 evidence comment](https://github.com/matthew-ngzc/Cooking-Spree/pull/7#issuecomment-5978174700). A clean successful-submission recording remains unavailable because randomized timing did not yield a safely reproducible short flow.
+- [x] Verify every upload is present in its intended PR comment and that every local source recording is playable. The PR evidence comments above are the durable review links.
+
 ## Dependencies and owner involvement
 
 - The orchestrator can investigate/fix the build, delegate bounded Luna work, write tests, review changes, and prepare a PR after this plan is approved and execution is requested.
