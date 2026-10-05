@@ -2,7 +2,7 @@
 
 [Overarching Android roadmap](android-roadmap.md) · [Previous: Phase 0](phase-0-baseline-recovery.md) · [Next: Phase 2](phase-2-single-player-quality.md)
 
-Status: accepted phase outcome; detailed execution plan pending Phase 0 implementation and verification. This outline does not authorize implementation.
+Status: accepted epic outcome; Epic 0 completion evidence was owner-approved on 2026-10-05. Detailed plans and required decisions remain pending; this outline does not authorize implementation.
 
 ## Intended outcome
 
@@ -10,7 +10,7 @@ Optional online competition enhances the game while guest/offline single-player 
 
 ## Phase progress
 
-- [ ] Phase 0 completion evidence reviewed.
+- [x] Phase 0 / Epic 0 completion evidence reviewed and owner-approved on 2026-10-05.
 - [ ] Detailed Phase 1 plan and required ADRs approved by the owner.
 - [ ] Cloud profile and explicit local/cloud conflict choice delivered and verified.
 - [ ] Global all-time leaderboard delivered and verified.
@@ -36,7 +36,7 @@ These checkboxes track progress but do not authorize implementation while this f
 
 Use Phase 0 verification evidence and the actual resulting sync/session boundaries when drafting tasks. Backend schema/rules access and owner-approved competition acceptance criteria are needed. Carry forward the unresolved account findings from the [repository review](../docs/reports/2026-09-21-repository-review.md); validate them against the code at planning time.
 
-The detailed plan will add bounded slices, affected files, tests for guest/offline/network/account failures, all automatic and manual conflict-choice/session-mode scenarios from ADR 0006, ranking acceptance criteria, documentation owners, and proposed backend/compatibility decisions. It must also define the issue-report destination and redacted diagnostic payload. Account level is not currently a profile field; include it in the comparison UI only if a separate progression decision adds it. Draft the plan at Phase 0 closeout before implementation begins.
+Split this epic into small reviewable plans before implementation. Each plan adds bounded slices, affected files, tests for its guest/offline/network/account failures, acceptance criteria, documentation owners, and required backend/compatibility decisions. Across the plans, cover every automatic and manual conflict-choice/session-mode scenario from ADR 0006, ranking acceptance, the issue-report destination, and its redacted diagnostic payload. Account level is not currently a profile field; include it in the comparison UI only if a separate progression decision adds it.
 
 ## Boundaries and related ideas
 
