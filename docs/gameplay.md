@@ -8,7 +8,7 @@ Purpose: change rules, interactions, HUD, recipes, scoring, tutorial wording, or
 2. The player selects/swaps the ingredient set shown in baskets, moves to a basket, and interacts to hold one item.
 3. Interacting with an empty pot deposits an ingredient. At three ingredients it cooks for the map-configured time (currently 6 seconds).
 4. A matching recipe produces that named dish; a non-matching set produces `Waste`. Collect a finished dish with empty hands.
-5. At a submission zone, the first active order with the same recipe name completes. A completion awards `100 × current streak`; the streak rises when completions are within 10 seconds.
+5. At a submission zone, the first active order with the same recipe name completes. A completion awards `100 × current streak`; the streak rises when consecutive completions are within 10 seconds (the 10-second boundary is included), otherwise the successful completion starts a new streak at 100 points.
 6. An expired order increments failures and is removed. Three failures end the game and persist a high score. Game over is terminal: one dialog, local statistics update, and saved-run clear are accepted even if multiple expiry callbacks arrive.
 
 Manual pause, backgrounding, and the tutorial walkthrough are separate pause reasons. Gameplay timers, order spawning/countdown, player movement and interaction, cooking, and ingredient exchange/filling advance only while no pause reason is active. Returning to the foreground removes only the background reason. Manual pause keeps its menu visible, including after backgrounding; Resume clears only the manual pause. Cooking and ingredient exchange continue with their unelapsed in-memory duration after resume.
@@ -29,6 +29,8 @@ The tutorial opens paused before order scheduling. Its existing movement demonst
 | Salad | tomato, potato, carrot |
 
 Recipe matching counts duplicate ingredients. When adding recipes or ingredients, update this catalogue, UI images/table sprites, Tiled properties, and save/load compatibility together.
+
+`GameplayRulesTest` protects exact multiset matching (including two potatoes in Mashed Potato), rejection of wrong, missing, or extra ingredients, one-second order expiry, the inclusive ten-second completion boundary, streak reset, and the three-failure terminal threshold. Device coverage also drives three expiring orders through both fresh and loaded game sessions.
 
 ## Interactions
 

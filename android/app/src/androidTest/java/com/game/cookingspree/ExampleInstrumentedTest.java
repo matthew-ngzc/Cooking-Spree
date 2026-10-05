@@ -45,7 +45,7 @@ public class ExampleInstrumentedTest {
     public void tutorialEntryComposesOneSessionAndClosesOnRepeatedExit() {
         android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         Context appContext = instrumentation.getTargetContext();
-        for (int attempt = 0; attempt < 2; attempt++) {
+        for (int attempt = 0; attempt < 5; attempt++) {
             Intent intent = new Intent(appContext, TutorialActivity.class)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             Activity launched = instrumentation.startActivitySync(intent);
@@ -549,6 +549,64 @@ public class ExampleInstrumentedTest {
     }
 
     @Test
+    public void freshAndLoadedSessionsFinalizeThreeRealExpiriesOnceAndClearSave() {
+        android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        Context appContext = instrumentation.getTargetContext();
+        SharedPreferences saves = appContext.getSharedPreferences("GameSave", Context.MODE_PRIVATE);
+        SharedPreferences profile = appContext.getSharedPreferences("chef_prefs", Context.MODE_PRIVATE);
+        SharedPreferences localHighScore = appContext.getSharedPreferences("ProcessManagerPrefs", Context.MODE_PRIVATE);
+        java.util.Map<String, ?> profileBefore = new java.util.HashMap<>(profile.getAll());
+        java.util.Map<String, ?> highScoreBefore = new java.util.HashMap<>(localHighScore.getAll());
+        saves.edit().clear().commit();
+        profile.edit().putInt("stats_games_played", 0).putFloat("stats_average_score", 0f)
+                .putInt("stats_high_score", 0).commit();
+        localHighScore.edit().putInt("highScore", 0).commit();
+
+        try {
+            GameActivity fresh = launchGame(instrumentation);
+            GameSaveSnapshot initial = instrumentationCall(instrumentation, fresh::captureSnapshotForTest);
+            writeLegacyFixture(saves, initial.toLegacyValues());
+            expireThreeOrders(instrumentation, fresh.gameManager);
+            await(() -> fresh.gameManager.isGameOver()
+                            && profile.getInt("stats_games_played", 0) == 1
+                            && saves.getAll().isEmpty(),
+                    5_000, "fresh game should finalize three expiries once and clear GameSave");
+            assertEquals(1, profile.getInt("stats_games_played", 0));
+            assertEquals(0f, profile.getFloat("stats_average_score", -1f), 0.001f);
+            assertEquals(0, profile.getInt("stats_high_score", -1));
+            assertTrue(saves.getAll().isEmpty());
+            finishAndAwaitClosed(instrumentation, fresh);
+
+            GameActivity loadedSource = launchGame(instrumentation);
+            GameSaveSnapshot base = instrumentationCall(instrumentation, loadedSource::captureSnapshotForTest);
+            GameSaveSnapshot loadedFixture = new GameSaveSnapshot(base.playerX, base.playerY, 200,
+                    0, base.heldItem, base.tableItems, java.util.Collections.emptyList(), base.pots);
+            finishAndAwaitClosed(instrumentation, loadedSource);
+            writeLegacyFixture(saves, loadedFixture.toLegacyValues());
+
+            GameActivity loaded = launchLoadGame(instrumentation);
+            assertTrue(loaded.loadSucceededForTest());
+            assertEquals(200, loaded.gameManager.getScore());
+            expireThreeOrders(instrumentation, loaded.gameManager);
+            await(() -> loaded.gameManager.isGameOver()
+                            && profile.getInt("stats_games_played", 0) == 2
+                            && saves.getAll().isEmpty(),
+                    5_000, "loaded game should finalize three expiries once and clear GameSave");
+            assertEquals(2, profile.getInt("stats_games_played", 0));
+            assertEquals(100f, profile.getFloat("stats_average_score", -1f), 0.001f);
+            assertEquals(200, profile.getInt("stats_high_score", -1));
+            assertTrue(saves.getAll().isEmpty());
+            finishAndAwaitClosed(instrumentation, loaded);
+        } finally {
+            restoreStats(profile, profileBefore);
+            SharedPreferences.Editor highScoreEditor = localHighScore.edit();
+            restoreInt(highScoreEditor, highScoreBefore, "highScore");
+            highScoreEditor.commit();
+            saves.edit().clear().commit();
+        }
+    }
+
+    @Test
     public void repeatedDonePotSnapshotsDoNotConsumeFood() {
         android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         Context appContext = instrumentation.getTargetContext();
@@ -642,6 +700,35 @@ public class ExampleInstrumentedTest {
             else throw new AssertionError("Unsupported fixture type " + value.getClass());
         }
         assertTrue("fixture write should complete", editor.commit());
+    }
+
+    private static void expireThreeOrders(android.app.Instrumentation instrumentation, GameManager manager) {
+        Recipe recipe = Recipe.getDefaultRecipes().get(0);
+        instrumentation.runOnMainSync(() -> {
+            for (int i = 0; i < 3; i++) {
+                manager.addProcessDirectly(Order.generateRandomOrder(recipe, 60, 1));
+            }
+        });
+    }
+
+    private static void restoreStats(SharedPreferences profile, java.util.Map<String, ?> before) {
+        SharedPreferences.Editor editor = profile.edit();
+        restoreInt(editor, before, "stats_games_played");
+        restoreFloat(editor, before, "stats_average_score");
+        restoreInt(editor, before, "stats_high_score");
+        editor.commit();
+    }
+
+    private static void restoreInt(SharedPreferences.Editor editor, java.util.Map<String, ?> values,
+                                  String key) {
+        Object value = values.get(key);
+        if (value instanceof Integer) editor.putInt(key, (Integer) value); else editor.remove(key);
+    }
+
+    private static void restoreFloat(SharedPreferences.Editor editor, java.util.Map<String, ?> values,
+                                    String key) {
+        Object value = values.get(key);
+        if (value instanceof Float) editor.putFloat(key, (Float) value); else editor.remove(key);
     }
 
     private static java.util.List<Integer> ingredientIds(java.util.List<Ingredient> ingredients) {

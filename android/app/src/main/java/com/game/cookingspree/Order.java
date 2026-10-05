@@ -9,35 +9,30 @@ import java.util.UUID;
 
 public class Order {
     private static final String TAG = "Order";
-    private static final long TIME_INTERVAL_MS = 1000; // 1 second interval
 
     private final String id;
     private final String name;
     private final int timeLimit; // in seconds
-    private int timeRemaining; // in seconds
-    private boolean isComplete;
-    private boolean isDead;
+    private final OrderCountdown countdown;
     private final Recipe recipe;
     private final Object mutex = new Object();
 
     private final ElapsedTimer elapsedTimer = new ElapsedTimer();
-    private final DeltaStepper timeStepper;
 
     private static final String[] CUSTOMER_NAMES = {
             "Customer A", "Customer B", "Customer C"
     };
 
     public Order(Recipe recipe, int timeLimit) {
+        this(recipe, timeLimit, timeLimit);
+    }
+
+    private Order(Recipe recipe, int timeLimit, int timeRemaining) {
         this.id = UUID.randomUUID().toString();
         this.name = CUSTOMER_NAMES[(int)(Math.random() * CUSTOMER_NAMES.length)];
         this.recipe = recipe;
         this.timeLimit = timeLimit;
-        this.timeRemaining = timeLimit;
-        this.isComplete = false;
-        this.isDead = false;
-
-        // Initialize the DeltaStepper with our time update logic
-        this.timeStepper = new DeltaStepper(TIME_INTERVAL_MS, this::timeStep);
+        this.countdown = new OrderCountdown(timeRemaining);
 
         Log.d(TAG, "New order created: " + name + ", Recipe: " + recipe.getName() + ", Time: " + timeLimit + "s");
     }
@@ -49,27 +44,7 @@ public class Order {
         return new Order(randomRecipe, randomTime);
     }
     public static Order generateRandomOrder(Recipe recipe, int timeLimit, int timeRemaining) {
-        Order order = new Order(recipe, timeLimit);
-        // Access the private field via reflection or add a package-private setter
-        order.timeRemaining = timeRemaining;
-        return order;
-    }
-
-    // This is called by the DeltaStepper
-    private boolean timeStep(long deltaTime) {
-        synchronized (mutex) {
-            if (!isComplete && !isDead) {
-                timeRemaining -= 1; // Decrement by 1 second
-
-                // Check for death
-                if (timeRemaining <= 0) {
-                    timeRemaining = 0;
-                    isDead = true;
-                    Log.d(TAG, "Order died: " + name);
-                }
-            }
-        }
-        return true; // Continue ordering time steps
+        return new Order(recipe, timeLimit, timeRemaining);
     }
 
     // This will be called from GameManager
@@ -78,7 +53,7 @@ public class Order {
         if (!elapsedTimer.isPaused()) {
             long delta = elapsedTimer.progress();
             if (delta > 0) {
-                timeStepper.update(delta);
+                synchronized (mutex) { countdown.advanceActiveMillis(delta); }
             }
         }
     }
@@ -94,8 +69,8 @@ public class Order {
 
     public void completeOrder() {
         synchronized (mutex) {
-            if (!isComplete && !isDead) {
-                isComplete = true;
+            if (!countdown.isComplete() && !countdown.isExpired()) {
+                countdown.complete();
                 Log.d(TAG, "Order completed: " + name);
             }
         }
@@ -116,19 +91,19 @@ public class Order {
 
     public int getTimeRemaining() {
         synchronized (mutex) {
-            return timeRemaining;
+            return countdown.getTimeRemaining();
         }
     }
 
     public boolean isComplete() {
         synchronized (mutex) {
-            return isComplete;
+            return countdown.isComplete();
         }
     }
 
     public boolean isDead() {
         synchronized (mutex) {
-            return isDead;
+            return countdown.isExpired();
         }
     }
 
@@ -141,7 +116,7 @@ public class Order {
     @Override
     public String toString() {
         synchronized (mutex) {
-            return "Order{" + "name='" + name + '\'' + ", recipe=" + recipe.getName() + ", timeRemaining=" + timeRemaining + ", isComplete=" + isComplete + ", isDead=" + isDead + '}';
+            return "Order{" + "name='" + name + '\'' + ", recipe=" + recipe.getName() + ", timeRemaining=" + countdown.getTimeRemaining() + ", isComplete=" + countdown.isComplete() + ", isDead=" + countdown.isExpired() + '}';
         }
     }
 }

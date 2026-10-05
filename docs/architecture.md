@@ -32,7 +32,7 @@ MainActivity ──> GameActivity / TutorialActivity
 | Map objects | `Game` | Lists are built once from the map. |
 | Pot contents/state | `Pot`, `PotFunctions` | Cooking runs on a shared executor. |
 | Basket contents / available ingredients | `BasketManager`, `IngredientFetchWorker` | Fetcher uses a producer/consumer queue to refill baskets. |
-| Orders, score, failures | `GameManager` | Main-thread handlers schedule spawning and 16-ms ticks. Spawn delay and order elapsed time stop across pauses. |
+| Orders, score, failures | `GameManager`, `OrderCountdown`, `CompletionScoring`, `FailureCounter` | Main-thread handlers schedule spawning and 16-ms ticks. Order active-time countdown, current streak scoring, and the three-failure threshold are isolated as deterministic rules used by the manager. |
 | Pause reasons / active time | Session `PauseState`, coordinated by `GameManager` | Manual menu, background, and tutorial pauses are independent; terminal and closed are final. Worker durations consume active time only. |
 | Activity/HUD state | `GameActivity` | Receives callbacks and updates Android views. |
 | Save compatibility and snapshots | `GameVersionPolicy`, `GameSaveSnapshot`, `GameSaveParser`, `PrefsHelper` | Same-major saves are parsed before application and again after synchronous persistence; failures remain behind the `LOAD` pause until the player acknowledges and the activity returns to the menu. |
@@ -49,6 +49,10 @@ Worker UI callbacks post through a session gate and check it again when the main
 The render thread reads safely published `Game` and run-state references, tolerates an uninitialized game, and exits when interrupted. Surface destruction interrupts it and joins for at most 300 ms outside game-state locks. A new surface does not start a second loop while the prior thread is still alive; if that thread exits after the new surface is available, it starts the replacement loop. Activity destruction permanently closes the renderer. Garbage-collection timing is not used as evidence of worker cleanup.
 
 On 2026-10-03, `testDebugUnitTest`, `assembleDebug`, and `assembleDebugAndroidTest` passed after these lifecycle changes. `connectedDebugAndroidTest` passed 5/5 tests on `emulator-5556` (Medium_Phone_API_36, API 36). It verified two tutorial entry/exit cycles with one composition and manager closure, bounded activity teardown during a live ingredient fetch and live pot cook, no late ingredient/order/UI changes after closure, and five actual `GameView` surface detach/reattach cycles with one render loop at a time. Each surface teardown completed within the test's two-second allowance; activity teardown closed all session owners within five seconds.
+
+On 2026-10-04, the integration suite passed 14/14 tests on `emulator-5556` (Medium_Phone_API_36, API 36). It repeats tutorial entry/exit five times, preserves the five-surface recreation check, and drives actual three-order expiries in both fresh and restored runs. `GameplayRulesTest` independently covers the pure recipe multiset, order countdown, scoring streak, and failure threshold seams. The automated run is supplemented by the visible acceptance evidence and explicit successful-submission capture limitation in [development.md](development.md).
+
+After the integration PR was restacked on the two-slot save branch on 2026-10-05, the combined suite passed 19/19 device tests on `emulator-5554` (Medium_Phone_API_36, API 36). Terminal save restoration now enters the same `FailureCounter` terminal seam used by live order expiry before the one-shot game-over callback runs; this avoids a second, divergent failure-count path.
 
 ## High-risk seams
 
