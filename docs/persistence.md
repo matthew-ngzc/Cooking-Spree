@@ -38,14 +38,14 @@ sequenceDiagram
     Prefs->>Candidate: Read back
     Prefs->>Snapshot: Exact map check and full parse
     alt Candidate invalid or write/readback fails
-        Prefs-->>Activity: Failure; selector and active payload stay unchanged
-        Activity-->>Player: Save failed; prior save remains, if any
+        Prefs-->>Activity: Failure, selector and active payload stay unchanged
+        Activity-->>Player: Save failed, prior save remains if any
     else Candidate verified
         Prefs->>Selector: Commit candidate slot and read back
         alt Selector promotion fails
             Prefs->>Selector: Best-effort restore prior selector
-            Prefs-->>Activity: Failure; previous active slot remains selected
-            Activity-->>Player: Save failed; prior save remains
+            Prefs-->>Activity: Failure, previous active slot remains selected
+            Activity-->>Player: Save failed, prior save remains
         else Promotion succeeds
             Note over Prefs,Selector: First legacy migration retains GameSave
             opt Previous active slot was A or B
@@ -138,7 +138,7 @@ sequenceDiagram
         App->>Device: Save locally first
         App->>Cloud: Attempt one atomic logical update
         Cloud--xApp: Write can fail
-        App-->>Player: Continue or Report issue; device save remains
+        App-->>Player: Continue or Report issue, device save remains
     end
 ```
 
