@@ -44,24 +44,14 @@ Link representative changed lines in the GitHub diff; do not merely list filenam
 
 ## Visual and behavior evidence
 
-<!--
-Required for every PR, regardless of phase: attach or link evidence that lets the reviewer assess the change without checking out the branch.
-- Visual/scene changes: labelled screenshots of every materially changed scene; include before/after views when useful.
-- Interaction, animation, or lifecycle changes: a short screen recording or a concise screenshot sequence.
-- Upload useful images/videos as the draft evolves with `gh pr edit --attach` or `gh pr comment --attach`.
-- Record the Android device/emulator and API level used.
-- Write "Not applicable" only when the change has no user-visible or device-observable effect, and explain why.
-Redact account details, tokens, Firebase configuration, and other sensitive data.
--->
-
+- [ ] Attached reviewable evidence following `AGENTS.md`; recorded device/API or explained any omission.
 - Evidence:
 - Device/emulator and API:
 
 ## Documentation
 
-- [ ] Updated the applicable docs under `docs/`.
-- [ ] Added/updated relevant architecture, sequence, state, flow, or data-model diagrams; or explained why no diagram helps.
-- [ ] Updated `docs/README.md` if documentation navigation changed.
+- [ ] Updated the owning docs and adjacent diagrams under `docs/`; followed `docs/doc-maintenance.md`.
+- [ ] Updated `docs/README.md` when routes or page ownership changed.
 - [ ] Added/updated an ADR if this changes a material commitment.
 
 ## Reviewer focus
