@@ -47,4 +47,12 @@ public class BasketManager {
     public int getBasketCount() {
         return baskets.size();
     }
+
+    List<String> getContentsSnapshotForTest() {
+        synchronized (basketsLock) {
+            List<String> contents = new ArrayList<>(baskets.size());
+            for (Basket basket : baskets) contents.add(basket.getIngredient());
+            return contents;
+        }
+    }
 }

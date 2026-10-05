@@ -24,6 +24,19 @@ public class PotFunctions {
         void potProgressUpdate(int progress);
     }
 
+    static final class SaveState {
+        final List<Ingredient> ingredients;
+        final CookedFood food;
+        final Recipe recipe;
+        final int progress;
+        SaveState(List<Ingredient> ingredients, CookedFood food, Recipe recipe, int progress) {
+            this.ingredients = ingredients;
+            this.food = food;
+            this.recipe = recipe;
+            this.progress = progress;
+        }
+    }
+
     public PotFunctions(int cookTime){
         this(cookTime, new PauseState());
     }
@@ -85,7 +98,7 @@ public class PotFunctions {
 
         if (!canCook) return;
         try {
-            while (!pauseState.runIfRunning(() -> { recipeCooking=recipe; cookProgress=0; })) {
+            while (!beginCooking(recipe)) {
                 if (!pauseState.awaitActiveDuration(0)) return;
             }
         } catch (InterruptedException e) {
@@ -93,6 +106,38 @@ public class PotFunctions {
             return;
         }
         cookUntilDone(recipe, listener);
+    }
+
+    boolean beginCooking(Recipe recipe) {
+        return pauseState.runIfRunning(() -> {
+            if (recipeCooking == null || cookProgress == null) {
+                recipeCooking = recipe;
+                cookProgress = 0;
+            }
+        });
+    }
+
+    SaveState snapshotForSave() {
+        synchronized (ingredientLock) {
+            synchronized (foodDoneLock) {
+                CookedFood foodCopy = foodDone == null ? null : new CookedFood(foodDone.getId(),
+                        foodDone.getName(), new ArrayList<>(foodDone.getMadeWith()));
+                return new SaveState(new ArrayList<>(ingredientsInside), foodCopy,
+                        recipeCooking, cookProgress == null ? -1 : cookProgress);
+            }
+        }
+    }
+
+    void restoreForLoad(List<Ingredient> ingredients, CookedFood food, Recipe recipe, int progress) {
+        synchronized (ingredientLock) {
+            synchronized (foodDoneLock) {
+                ingredientsInside.clear();
+                ingredientsInside.addAll(ingredients);
+                foodDone = food;
+                recipeCooking = recipe;
+                cookProgress = progress;
+            }
+        }
     }
 
     public void restartCooking(Recipe recipe,PotListener listener){
@@ -144,6 +189,8 @@ public class PotFunctions {
     public int getCookProgress(){
         return this.cookProgress;
     }
+
+    int getMaximumProgressTicks() { return cookTime / progressStep; }
 
     public void setCookedFood(CookedFood food) {
         //For loading

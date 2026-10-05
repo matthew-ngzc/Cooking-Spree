@@ -111,6 +111,8 @@ public class Pot extends Interactable {
                                     cookRecipe=new Recipe("Waste",new ArrayList<>());
                                 }
 
+                                if (!potFunctions.beginCooking(cookRecipe)) break;
+
                                 //Set state to cooking
                                 state = State.COOKING;
 
@@ -237,6 +239,57 @@ public class Pot extends Interactable {
 
     public CookedFood getFood(){
         return potFunctions.getFood();
+    }
+
+    GameSaveSnapshot.SavedPot snapshotForSave() {
+        synchronized (stateLock) {
+            PotFunctions.SaveState saved = potFunctions.snapshotForSave();
+            List<Integer> ingredientIds = new ArrayList<>();
+            for (Ingredient ingredient : saved.ingredients) ingredientIds.add(ingredient.getId());
+            if (state == State.DONE) {
+                if (saved.food == null) throw new IllegalStateException("Finished pot has no food");
+                List<Integer> foodIngredients = new ArrayList<>();
+                for (Ingredient ingredient : saved.food.getMadeWith()) foodIngredients.add(ingredient.getId());
+                GameSaveSnapshot.SavedItem food = new GameSaveSnapshot.SavedItem(
+                        PlayerInventory.COOKED, saved.food.getId(), saved.food.getName(), foodIngredients);
+                return new GameSaveSnapshot.SavedPot(state, ingredientIds, food, 0, null, new ArrayList<>());
+            }
+            if (state == State.COOKING) {
+                if (saved.recipe == null || saved.progress < 0) {
+                    throw new IllegalStateException("Cooking pot has no initialized recipe progress");
+                }
+                List<Integer> recipeIngredients = new ArrayList<>();
+                for (Ingredient ingredient : saved.recipe.getIngredients()) recipeIngredients.add(ingredient.getId());
+                return new GameSaveSnapshot.SavedPot(state, ingredientIds, null, saved.progress,
+                        saved.recipe.getName(), recipeIngredients);
+            }
+            if (saved.food != null || saved.recipe != null) {
+                throw new IllegalStateException("Empty pot has cooking or finished food");
+            }
+            return new GameSaveSnapshot.SavedPot(state, ingredientIds, null, 0, null, new ArrayList<>());
+        }
+    }
+
+    void restoreForLoad(GameSaveSnapshot.SavedPot saved) {
+        synchronized (stateLock) {
+            List<Ingredient> contents = new ArrayList<>();
+            for (int id : saved.ingredients) contents.add(new Ingredient(id));
+            CookedFood food = null;
+            if (saved.food != null) {
+                List<Ingredient> madeWith = new ArrayList<>();
+                for (int id : saved.food.ingredients) madeWith.add(new Ingredient(id));
+                food = new CookedFood(saved.food.id, saved.food.name, madeWith);
+            }
+            Recipe recipe = null;
+            if (saved.state == State.COOKING) {
+                List<Ingredient> recipeItems = new ArrayList<>();
+                for (int id : saved.recipeIngredients) recipeItems.add(new Ingredient(id));
+                recipe = new Recipe(saved.recipeName, recipeItems);
+            }
+            potFunctions.restoreForLoad(contents, food, recipe, saved.cookingProgress);
+            state = saved.state;
+            updateSprite();
+        }
     }
 
     public void setState(String newState) {

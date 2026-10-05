@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="game_saved">Game saved</string>
+    <string name="game_save_failed_previous_available">Save failed. Your previous save is still available.</string>
+    <string name="game_save_failed_none_created">Save failed. No save was created.</string>
     <string name="app_name">Cooking Spree</string>
 
     <!-- Game UI Strings -->
@@ -45,6 +48,10 @@
     <string name="welcome">Welcome!</string>
     <string name="sign_out">Sign Out</string>
     <string name="sign_in_with_google" />
+
+    <string name="save_recovery_title">Saved game unavailable</string>
+    <string name="incompatible_save_message">This save was made with version %1$s. The current game is version %2$s, so this save is incompatible. It will be removed after you acknowledge this message.</string>
+    <string name="corrupt_save_message">This saved game is corrupt or inconsistent and cannot be restored. It will be removed after you acknowledge this message.</string>
 
 
 </resources>

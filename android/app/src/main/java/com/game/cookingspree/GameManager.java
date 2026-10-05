@@ -224,6 +224,13 @@ public class GameManager {
             endGame();
         }
     }
+
+    void restoreTerminalResult(int finalScore, int failures) {
+        if (closed || isGameOver || failures != MAX_DEAD_PROCESSES) return;
+        score = finalScore;
+        deadProcessCount = failures;
+        endGame();
+    }
     private void handlePendingRemovals() {
         synchronized (mutex) {
             if (!pendingRemovals.isEmpty()) {
@@ -328,6 +335,7 @@ public class GameManager {
     public void pauseForBackground() { setPauseReason(PauseState.Reason.BACKGROUND, true); }
     public void resumeFromBackground() { setPauseReason(PauseState.Reason.BACKGROUND, false); }
     public void pauseForTutorial(boolean paused) { setPauseReason(PauseState.Reason.TUTORIAL, paused); }
+    public void setLoading(boolean loading) { setPauseReason(PauseState.Reason.LOAD, loading); }
 
     private void setPauseReason(PauseState.Reason reason, boolean paused) {
         if (closed || isGameOver) return;

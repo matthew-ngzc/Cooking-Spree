@@ -5,7 +5,6 @@ import static android.view.View.VISIBLE;
 
 
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.text.Html;
@@ -222,9 +221,7 @@ public class MainActivity extends BaseActivity {
         });
 
         loadGameButton.setOnClickListener(v -> {
-            // Check if a save exists
-            SharedPreferences prefs = getSharedPreferences("GameSave", MODE_PRIVATE);
-            if (prefs.contains("score")) {
+            if (PrefsHelper.hasGameSave()) {
                 Intent gameIntent = new Intent(MainActivity.this, GameActivity.class);
                 gameIntent.putExtra("loadSavedGame", true);
                 startActivity(gameIntent);

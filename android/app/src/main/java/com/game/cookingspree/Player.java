@@ -10,6 +10,7 @@ public class Player {
     private final Bitmap sprite;
     private Bitmap scaledSprite;
     private volatile float x, y;
+    private volatile float committedX, committedY;
     private volatile float targetX, targetY;
     private volatile boolean isMoving = false;
     private volatile int queuedDX = 0, queuedDY = 0;
@@ -20,6 +21,8 @@ public class Player {
     public Player(float x, float y, Bitmap sprite, int tileSize, Game game,PlayerInventory playerInventory) {
         this.x = x;
         this.y = y;
+        this.committedX = x;
+        this.committedY = y;
         this.targetX = x;
         this.targetY = y;
         this.sprite = sprite;
@@ -31,6 +34,8 @@ public class Player {
     public void setPosition(float x, float y) {
         this.x = x;
         this.y = y;
+        this.committedX = x;
+        this.committedY = y;
         this.targetX = x;
         this.targetY = y;
         this.isMoving = false;
@@ -42,6 +47,8 @@ public class Player {
 
     public float getX() { return x; }
     public float getY() { return y; }
+    int getLogicalSaveX() { return Math.round(committedX / tileSize) * tileSize; }
+    int getLogicalSaveY() { return Math.round(committedY / tileSize) * tileSize; }
 
     public void draw(Canvas canvas, Paint paint, int tileSize) {
         if (sprite == null) return;
@@ -129,6 +136,8 @@ public class Player {
         if (dist < moveSpeed) {
             x = targetX;
             y = targetY;
+            committedX = targetX;
+            committedY = targetY;
             isMoving = false;
 
             if (movementHeld) {

@@ -7,10 +7,18 @@ Purpose: safely modify saves, settings, authentication, or Firebase. For game ru
 | Store | Owner | Contents |
 | --- | --- | --- |
 | `chef_prefs` | `PrefsHelper` | volume, joystick scale, language, profile fields, and aggregate stats. |
-| `GameSave` | `GameActivity` / `PrefsHelper` | player position, score/failures, held item, table items, active orders, and pot states/contents/progress. Basket selection, ingredient-fetch state, and scoring streak state are not saved. |
+| `GameSave` | `PrefsHelper` | Compatibility source for a versioned save created before two-slot storage. It is read only when no active two-slot selector exists. |
+| `GameSaveSlotA` / `GameSaveSlotB` | `PrefsHelper` | Alternating active and inactive saved-game payloads: player position, score/failures, held item, table items, active orders, and pot states/contents/progress. |
+| `GameSaveSelector` | `PrefsHelper` | The small selector naming which verified slot is active. |
 | `ProcessManagerPrefs` | `GameManager` | legacy local high score written on game over. |
 
-The save format is manually keyed in `GameActivity.saveGameState()` and `loadGameState()`, not versioned. Adding/reordering objects, modifying IDs, or changing a recipe/dish representation needs a migration/default strategy and a save/load smoke test. A completed loaded game should clear the save; verify this path when changing it.
+The manually keyed payload stores the full semantic game version and stable ingredient/recipe identities. `GameVersionPolicy` treats equal major versions as compatible; missing, malformed, or different-major versions are incompatible. The current app version is `1.0.0`. Saving is allowed only from the manual pause menu. `GameSaveSnapshot` captures a non-consuming snapshot at the player's last fully reached traversable tile and validates it before storage. `PrefsHelper` writes the candidate to the inactive slot, synchronously reads it back, requires an exact map match plus a successful full parse, and only then promotes the active-slot selector. Capture, validation, candidate-write, readback, verifier, or selector-promotion failure returns failure without touching the active payload. The UI says the previous save remains available, or says no save was created when none existed.
+
+When the selector is absent, `PrefsHelper` reads the pre-two-slot `GameSave` compatibility source. The first successful two-slot save promotes slot A while retaining that source as the untouched prior save. After a later successful A/B promotion, the compatibility source is no longer needed and is cleared. Save discovery, loading, and clearing must use `PrefsHelper`: clearing removes the compatibility source, both slots, and the selector.
+
+Loading adds a session `LOAD` pause before order scheduling and ingredient basket filling can mutate gameplay. `GameSaveParser` reads the entire `SharedPreferences.getAll()` map into a candidate and validates field types, counts, stable item/recipe identities, recipes (including `Waste` and dishes with no active matching order), pot consistency/progress, order times, map counts, and a traversable tile before any candidate field is applied. Incompatible versions and same-major corrupt saves show distinct blocking dialogs. Acknowledging either clears the rejected save and returns to the menu; no fresh or partially restored session becomes playable. If application throws after validation, `LOAD` stays held until acknowledgment and the activity closes. A terminal compatible snapshot restores its score/failure result and invokes finalization exactly once.
+
+The versioned format remains coupled to table/pot map ordering even though ingredients and recipes now use stable persisted identities. A release that incompatibly adds, removes, or reorders persistent map objects, removes an identity, or changes saved-state semantics must increment the semantic major version; cosmetic skins and compatible presentation changes do not. Basket selection, ingredient-fetch state, and scoring streak state remain intentionally unsaved.
 
 ## Firebase / Google sign-in
 

@@ -20,7 +20,11 @@ public class Recipe {
     private final List<Ingredient> ingredients;
 
     public Recipe(String name, List<Ingredient> ingredients) {
-        this.id = java.util.UUID.randomUUID().toString();
+        this(java.util.UUID.randomUUID().toString(), name, ingredients);
+    }
+
+    private Recipe(String id, String name, List<Ingredient> ingredients) {
+        this.id = id;
         this.name = name;
         this.ingredients = ingredients;
     }
@@ -48,10 +52,10 @@ public class Recipe {
                 new Ingredient(CARROT)
         );
 
-        recipes.add(new Recipe("Tomato Soup", tomatoSoupIngredients));
-        recipes.add(new Recipe("Veggie Stew", veggieStewIngredients));
-        recipes.add(new Recipe("Mashed Potato", mashedPotatoIngredients));
-        recipes.add(new Recipe("Salad", saladIngredients));
+        recipes.add(new Recipe("tomato_soup", "Tomato Soup", tomatoSoupIngredients));
+        recipes.add(new Recipe("veggie_stew", "Veggie Stew", veggieStewIngredients));
+        recipes.add(new Recipe("mashed_potato", "Mashed Potato", mashedPotatoIngredients));
+        recipes.add(new Recipe("salad", "Salad", saladIngredients));
 
         return recipes;
     }
