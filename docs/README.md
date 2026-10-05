@@ -1,6 +1,6 @@
 # Cooking Spree documentation
 
-Purpose: route an agent to the smallest document needed to work safely. This directory describes the checked-in app as inspected on 2026-09-21; code and Gradle files remain authoritative.
+Purpose: route an agent to the smallest document needed to work safely. These pages describe the checked-in app; source and Gradle configuration remain authoritative.
 
 | Need | Read |
 | --- | --- |
@@ -21,12 +21,24 @@ Purpose: route an agent to the smallest document needed to work safely. This dir
 | Read the repository review, corrected against current code on 2026-10-01 | [reports/2026-09-21-repository-review.md](reports/2026-09-21-repository-review.md) |
 | Finish a change without leaving docs stale | [doc-maintenance.md](doc-maintenance.md) |
 
+## How it works: visual index
+
+| Flow | Canonical explanation and diagram |
+| --- | --- |
+| Runtime composition and session ownership | [architecture.md — Runtime shape](architecture.md#runtime-shape) |
+| Session worker shutdown and late-callback rejection | [architecture.md — Concurrency boundaries](architecture.md#concurrency-boundaries) |
+| Save to alternating verified slots | [persistence.md — Two-slot save transaction](persistence.md#two-slot-save-transaction) |
+| Load, version decision, validation, and rejection | [persistence.md — Load decision](persistence.md#load-decision) |
+| Pause reasons, tutorial movement, and terminal state | [gameplay.md — Pause and tutorial lifecycle](gameplay.md#pause-and-tutorial-lifecycle) |
+| Exact dish submission, scoring, expiry, and one-shot game over | [gameplay.md — Submission and terminal flow](gameplay.md#submission-and-terminal-flow) |
+| Account profile and optional cloud field sync | [persistence.md — Local and cloud boundary](persistence.md#local-and-cloud-boundary) |
+
 The top-level [AGENTS.md](../AGENTS.md) is the operating contract for AI agents, including plan/delegate/review expectations.
 The top-level [CONTEXT.md](../CONTEXT.md) is the canonical product glossary.
 
 ## App in one paragraph
 
-Cooking Spree is a landscape Android single-player cooking game. The player moves tile-by-tile around a Tiled kitchen, picks up a rotating set of ingredients, cooks exact three-ingredient recipes, and submits finished dishes before randomly spawned orders expire. Three expired orders end the game. The app has a menu, tutorial, pause/save/load flow, local preferences, and an unfinished Google/Firebase account-sync integration.
+Cooking Spree is a landscape Android single-player cooking game. The player moves tile-by-tile around a Tiled kitchen, picks up a rotating set of ingredients, cooks exact three-ingredient recipes, and submits finished dishes before randomly spawned orders expire. Three expired orders end the game. The app has a menu, tutorial, pause/save/load flow, device-local preferences and saves, and optional Google/Firebase profile sync that remains incomplete; the game is playable offline without an account.
 
 ## Repository map
 
