@@ -8,7 +8,7 @@
 
 ## Plan scope and dependency
 
-- Plan/phase:
+- Epic/plan:
 - Slices assigned to this PR:
 - Base PR/branch and dependencies:
 - Independently mergeable: Yes / No — explain

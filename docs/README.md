@@ -5,7 +5,7 @@ Purpose: route an agent to the smallest document needed to work safely. These pa
 | Need | Read |
 | --- | --- |
 | Understand audience, product direction, online/offline boundaries, or platform scope | [product.md](product.md) |
-| Understand accepted product priorities and phase boundaries | [direction.md](direction.md) |
+| Understand accepted product priorities and epic boundaries | [direction.md](direction.md) |
 | Capture or revisit an uncommitted inspiration | [ideas/README.md](ideas/README.md) |
 | Create an asset brief or integrate a Gemini-created visual | [assets.md](assets.md) |
 | Orient to the repository, run it, build it, or test it | [development.md](development.md) |
@@ -13,8 +13,8 @@ Purpose: route an agent to the smallest document needed to work safely. These pa
 | Change the canvas engine, map, controls, concurrency, or screen wiring | [architecture.md](architecture.md) |
 | Change sign-in, saved games, settings, local data, or Firebase | [persistence.md](persistence.md) |
 | Pick up known product/technical work | [roadmap.md](roadmap.md) |
-| See the long-term goal, phase summaries, and links to phase plans and ideas | [Overarching Android roadmap](../plans/android-roadmap.md) |
-| Execute the detailed Phase 0 baseline recovery contract | [Phase 0 plan](../plans/phase-0-baseline-recovery.md) |
+| See the long-term goal, epic summaries, and links to plans and ideas | [Overarching Android roadmap](../plans/android-roadmap.md) |
+| Inspect the completed Epic 0 baseline recovery contract and evidence | [Epic 0 plan](../plans/phase-0-baseline-recovery.md) |
 | Record or evaluate a material product/technical decision | [decisions/README.md](decisions/README.md); [repository layout](decisions/0004-project-root-repository.md); [accepted Phase 0 boundaries](decisions/0003-phase-zero-session-and-save-boundaries.md); [accepted session cloud-sync policy](decisions/0006-session-scoped-cloud-profile-sync.md); [accepted versioned-save policy](decisions/0007-versioned-verified-saves.md) |
 | Understand the accepted Android project directory name | [ADR 0005 — Android project directory](decisions/0005-android-project-directory.md) |
 | See the evidence behind the agent workflow | [research/matt-pocock-agentic-workflow.md](research/matt-pocock-agentic-workflow.md) |
@@ -25,6 +25,7 @@ Purpose: route an agent to the smallest document needed to work safely. These pa
 
 | Flow | Canonical explanation and diagram |
 | --- | --- |
+| Epic, plan, Luna-slice, and PR hierarchy | [Android roadmap — Epics and their plans](../plans/android-roadmap.md#epics-and-their-plans) |
 | Runtime composition and session ownership | [architecture.md — Runtime shape](architecture.md#runtime-shape) |
 | Session worker shutdown and late-callback rejection | [architecture.md — Concurrency boundaries](architecture.md#concurrency-boundaries) |
 | Save to alternating verified slots | [persistence.md — Two-slot save transaction](persistence.md#two-slot-save-transaction) |
@@ -51,8 +52,8 @@ Cooking Spree is a landscape Android single-player cooking game. The player move
 | `Tiled stuff/` | Tiled authoring map and TSX tile metadata. |
 | `new sprites/` | Source sprite artwork. |
 | `plans/COOKING SPREE future plans.md` | Original, unprioritised backlog; see the distilled notes in `roadmap.md`. |
-| `plans/android-roadmap.md` | Overarching Android plan: long-term goal, phase summaries, completion rules, and links to phase plans and ideas. |
-| `plans/phase-*.md` | One plan per phase; Phase 0 contains detailed Luna slices, while later phases retain outcome outlines until ready for detailed planning. |
+| `plans/android-roadmap.md` | Overarching Android plan: long-term goal, epic summaries, completion rules, and links to plans and ideas. |
+| `plans/phase-*.md` | Legacy-named epic files: Epic 0 contains its completed detailed plan and Luna slices; later files remain outcome outlines until split into reviewable plans. |
 | `logs *.txt` | Historical debugging output; ignored by Git and not current runtime documentation. |
 
 The project root is the sole Git repository and contains the canonical guidance, documentation, plans, map-authoring sources, and source artwork alongside the Android project.
